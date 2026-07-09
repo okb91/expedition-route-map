@@ -472,7 +472,7 @@ progress {
 
 .strip-hint {
   margin: 0.25rem 0 0;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
 }
 
@@ -480,7 +480,7 @@ progress {
   display: flex;
   gap: 1rem;
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
 }
 
@@ -488,42 +488,360 @@ progress {
   padding: 0 1rem 1rem;
 }
 
+/* ── Game-style strip widget ── */
+.strip-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.strip-hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1.25rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #0f2340 0%, #0a1628 100%);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.08);
+}
+
+.strip-hud-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.75rem;
+  flex: 1;
+  min-width: 200px;
+}
+
+.strip-badge {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+.strip-hud-title {
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.strip-hud-sub {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  width: 100%;
+}
+
+.strip-hud-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.strip-stat {
+  font-family: var(--mono);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.strip-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.strip-btn {
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.strip-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.strip-btn-play {
+  font-size: 0.82rem;
+  padding: 0 0.75rem;
+  white-space: nowrap;
+}
+
+.strip-btn-play.active {
+  border-color: var(--accent-pink);
+  color: var(--accent-pink);
+  box-shadow: 0 0 12px rgba(255, 64, 129, 0.35);
+  animation: strip-pulse 1.2s ease-in-out infinite;
+}
+
+.strip-zoom-label {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  min-width: 2.8rem;
+  text-align: center;
+}
+
+.strip-speed {
+  height: 2rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+
+.strip-viewport {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0a1628;
+}
+
+.strip-depth-axis {
+  position: relative;
+  flex: 0 0 52px;
+  background: #071220;
+  border-right: 1px solid var(--border);
+  margin-top: 0;
+  height: 480px;
+}
+
+.strip-depth-tick {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(79, 195, 247, 0.9);
+  white-space: nowrap;
+}
+
 .strip-scroll {
   position: relative;
+  flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
-  background: #0a1628;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  height: 420px;
+  height: 480px;
   cursor: crosshair;
   scrollbar-width: thin;
   scrollbar-color: var(--accent) var(--bg-elevated);
+  outline: none;
+}
+
+.strip-scroll:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(0, 229, 255, 0.4);
 }
 
 .strip-scroll::-webkit-scrollbar {
-  height: 10px;
+  height: 12px;
 }
 
 .strip-scroll::-webkit-scrollbar-thumb {
   background: var(--accent);
-  border-radius: 5px;
+  border-radius: 6px;
 }
 
 .strip-canvas {
   display: block;
-  height: 400px;
+  height: 480px;
 }
 
-.strip-cursor {
+.strip-overlay {
   position: absolute;
   top: 0;
-  width: 2px;
-  height: 100%;
-  background: var(--accent-pink);
+  left: 0;
+  height: 480px;
   pointer-events: none;
-  transform: translateX(-1px);
-  box-shadow: 0 0 8px var(--accent-pink);
+}
+
+.strip-marker {
+  position: absolute;
+  pointer-events: auto;
+  transform: translateX(-50%);
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: center;
+  font-family: var(--font);
+  color: var(--text);
+  transition: transform 0.15s, filter 0.15s;
+}
+
+.strip-marker:hover,
+.strip-marker.active {
+  transform: translateX(-50%) scale(1.06);
+  filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.6));
+  z-index: 5;
+}
+
+.strip-wp {
+  top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  max-width: 140px;
+}
+
+.strip-wp.flip {
+  top: auto;
+  bottom: 268px;
+}
+
+.strip-wp-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #041018;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  font-weight: 800;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+}
+
+.strip-wp.active .strip-wp-num {
+  background: var(--accent-pink);
+  box-shadow: 0 0 14px rgba(255, 64, 129, 0.7);
+}
+
+.strip-wp-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.strip-wp-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+.strip-wp-sub {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.2;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.strip-wp.milestone .strip-wp-num {
+  animation: strip-milestone 0.9s ease-out;
+}
+
+.strip-poi {
+  top: 118px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  max-width: 130px;
+}
+
+.strip-poi.flip {
+  top: 148px;
+}
+
+.strip-poi-dot {
+  color: var(--accent-pink);
+  font-size: 1rem;
+  text-shadow: 0 0 8px rgba(255, 64, 129, 0.8);
+}
+
+.strip-poi-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #ffb3cc;
+  line-height: 1.15;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+
+.strip-poi-type {
+  font-size: 0.68rem;
+  color: rgba(255, 180, 200, 0.75);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.strip-yacht {
+  position: absolute;
+  top: 192px;
+  transform: translateX(-50%);
+  font-size: 1.75rem;
+  filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.8));
+  transition: left 0.25s ease-out;
+  pointer-events: none;
+  z-index: 10;
+  animation: strip-yacht-bob 2.5s ease-in-out infinite;
+}
+
+.strip-probe {
+  position: absolute;
+  top: 36px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.35rem 0.55rem;
+  background: rgba(10, 22, 40, 0.92);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text);
+  pointer-events: none;
+  z-index: 20;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+
+.strip-probe strong {
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+@keyframes strip-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 64, 129, 0.25); }
+  50% { box-shadow: 0 0 18px rgba(255, 64, 129, 0.55); }
+}
+
+@keyframes strip-milestone {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.45); }
+  100% { transform: scale(1); }
+}
+
+@keyframes strip-yacht-bob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-4px); }
 }
 
 .footer {
@@ -784,5 +1102,27 @@ progress {
 
   .panel-head h2 {
     font-size: 0.88rem;
+  }
+
+  .strip-hud {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .strip-controls {
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+
+  .strip-wp-name {
+    font-size: 0.85rem;
+  }
+
+  .strip-depth-axis {
+    flex: 0 0 40px;
+  }
+
+  .strip-depth-tick {
+    font-size: 0.62rem;
   }
 }
