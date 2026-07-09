@@ -11,6 +11,7 @@ const COUNTRY_NAMES = {
 const WP_ICON = { port: '⚓', canal: '🔧', passage: '⛵', science: '🔬' };
 const DEPTH_MARKS = [1000, 2000, 3000, 4000, 5000, 6000];
 const MAX_DEPTH = 6000;
+const SAMPLE_EVERY_NM = 100;
 
 export function createStripView(container, callbacks) {
   let routeData = null;
@@ -25,12 +26,15 @@ export function createStripView(container, callbacks) {
   let hudEl = null;
   let depthAxisEl = null;
   let depths = [];
+  let gebcoSamples = [];
   let activeIndex = 0;
   let pxPerNm = 5;
   let hoverIndex = null;
   let playTimer = null;
   let playSpeed = 1;
   let playOn = false;
+  let depthLoadToken = 0;
+  let drawScheduled = false;
 
   const CANVAS_H = 480;
   const profileHeight = 130;
@@ -97,7 +101,7 @@ export function createStripView(container, callbacks) {
 
     scrollWrap.addEventListener('click', (e) => {
       if (e.target.closest('.strip-marker')) return;
-      const x = clientXToCanvasX(e.clientX);
+      const x = clientXToContentX(e.clientX);
       setActiveIndex(xToIndex(x));
     });
 
@@ -114,10 +118,10 @@ export function createStripView(container, callbacks) {
     });
     window.addEventListener('mouseup', () => { isDragging = false; });
     scrollWrap.addEventListener('mousemove', (e) => {
-      const x = clientXToCanvasX(e.clientX);
+      const x = clientXToContentX(e.clientX);
       const idx = xToIndex(x);
       hoverIndex = idx;
-      updateProbe(e, idx);
+      updateProbe(idx);
       if (isDragging) setActiveIndex(idx);
     });
     scrollWrap.addEventListener('mouseleave', () => {
@@ -140,9 +144,10 @@ export function createStripView(container, callbacks) {
     });
   }
 
-  function clientXToCanvasX(clientX) {
-    const rect = canvas.getBoundingClientRect();
-    return (clientX - rect.left) / rect.width * canvas.width + scrollWrap.scrollLeft;
+  /** X в координатах контента scroll-контейнера (1 px = 1 NM·pxPerNm) */
+  function clientXToContentX(clientX) {
+    const sr = scrollWrap.getBoundingClientRect();
+    return scrollWrap.scrollLeft + (clientX - sr.left);
   }
 
   function nmToX(nm) {
@@ -179,7 +184,7 @@ export function createStripView(container, callbacks) {
   }
 
   function depthToY(depth) {
-    const d = Math.min(Math.abs(depth ?? 2000), MAX_DEPTH);
+    const d = Math.min(Math.abs(depth ?? 0), MAX_DEPTH);
     return profileTop + (d / MAX_DEPTH) * (profileHeight - 16);
   }
 
@@ -187,6 +192,95 @@ export function createStripView(container, callbacks) {
     const z = zoneResults?.[i];
     if (!z) return ZONE_TYPES.unknown;
     return ZONE_TYPES[z.zone] || ZONE_TYPES.unknown;
+  }
+
+  function initDepthsFromEstimate() {
+    if (!routeData) return;
+    depths = routeData.points.map((p) => estimateDepth(p.lat, p.lon));
+    gebcoSamples = [];
+  }
+
+  function interpolateDepthsFromSamples() {
+    if (!routeData) return;
+    const points = routeData.points;
+    if (gebcoSamples.length === 0) {
+      depths = points.map((p) => estimateDepth(p.lat, p.lon));
+      return;
+    }
+    const sorted = [...gebcoSamples].sort((a, b) => a.distanceNm - b.distanceNm);
+    depths = points.map((p) => {
+      const nm = p.distanceNm;
+      if (nm <= sorted[0].distanceNm) return sorted[0].depth;
+      if (nm >= sorted[sorted.length - 1].distanceNm) return sorted[sorted.length - 1].depth;
+      for (let s = 0; s < sorted.length - 1; s++) {
+        const a = sorted[s];
+        const b = sorted[s + 1];
+        if (nm >= a.distanceNm && nm <= b.distanceNm) {
+          const span = b.distanceNm - a.distanceNm;
+          const t = span > 0 ? (nm - a.distanceNm) / span : 0;
+          return a.depth + t * (b.depth - a.depth);
+        }
+      }
+      return estimateDepth(p.lat, p.lon);
+    });
+  }
+
+  function sampleIndicesForDepth() {
+    const points = routeData.points;
+    const indices = [0];
+    let lastNm = points[0].distanceNm;
+    for (let i = 1; i < points.length - 1; i++) {
+      if (points[i].distanceNm - lastNm >= SAMPLE_EVERY_NM) {
+        indices.push(i);
+        lastNm = points[i].distanceNm;
+      }
+    }
+    if (points.length > 1) indices.push(points.length - 1);
+    return [...new Set(indices)];
+  }
+
+  function scheduleDraw() {
+    if (drawScheduled) return;
+    drawScheduled = true;
+    requestAnimationFrame(() => {
+      drawScheduled = false;
+      draw();
+    });
+  }
+
+  async function loadDepths() {
+    if (!routeData) return;
+    const token = ++depthLoadToken;
+    const points = routeData.points;
+    const indices = sampleIndicesForDepth();
+
+    for (const i of indices) {
+      if (token !== depthLoadToken) return;
+      const p = points[i];
+      let d = await queryGebcoDepth(p.lon, p.lat);
+      if (d == null) d = estimateDepth(p.lat, p.lon);
+      else if (d > 0) d = -Math.abs(d);
+
+      gebcoSamples.push({ distanceNm: p.distanceNm, depth: d });
+      interpolateDepthsFromSamples();
+      scheduleDraw();
+      await new Promise((r) => setTimeout(r, 80));
+    }
+  }
+
+  function renderDepthAxis() {
+    depthAxisEl.innerHTML = DEPTH_MARKS.map((m) => {
+      const y = depthToY(-m);
+      return `<span class="strip-depth-tick" style="top:${y}px">${(m / 1000).toFixed(0)}k м</span>`;
+    }).join('');
+  }
+
+  function syncCanvasSize(width) {
+    canvas.width = width;
+    canvas.height = CANVAS_H;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${CANVAS_H}px`;
+    overlayEl.style.width = `${width}px`;
   }
 
   function currentStage() {
@@ -223,14 +317,12 @@ export function createStripView(container, callbacks) {
     if (pxPerNm === prev) return;
     const p = routeData?.points?.[activeIndex];
     const anchorNm = p?.distanceNm ?? 0;
-    const anchorX = anchorNm * prev;
-    const viewCenter = scrollWrap.scrollLeft + scrollWrap.clientWidth / 2;
+    const anchorXBefore = anchorNm * prev;
+    const scrollRatio = scrollWrap.scrollLeft / Math.max(1, (routeData?.totalNm ?? 1) * prev);
     draw();
-    const newAnchorX = anchorNm * pxPerNm;
-    scrollWrap.scrollLeft += newAnchorX - anchorX;
-    if (Math.abs(viewCenter - anchorX) < scrollWrap.clientWidth) {
-      scrollWrap.scrollLeft = Math.max(0, newAnchorX - scrollWrap.clientWidth / 2);
-    }
+    scrollWrap.scrollLeft = scrollRatio * nmToX(routeData?.totalNm ?? 0);
+    const anchorXAfter = anchorNm * pxPerNm;
+    scrollWrap.scrollLeft += anchorXAfter - anchorXBefore;
     root.querySelector('[data-zoom-label]').textContent = `${Math.round((pxPerNm / 5) * 100)}%`;
   }
 
@@ -279,32 +371,6 @@ export function createStripView(container, callbacks) {
     scrollWrap.scrollLeft = Math.max(0, x - scrollWrap.clientWidth * 0.35);
   }
 
-  async function loadDepths() {
-    if (!routeData) return;
-    const points = routeData.points;
-    depths = new Array(points.length).fill(null);
-    const sampleEvery = 8;
-    for (let i = 0; i < points.length; i += sampleEvery) {
-      const p = points[i];
-      let d = await queryGebcoDepth(p.lon, p.lat);
-      if (d == null) d = estimateDepth(p.lat, p.lon);
-      depths[i] = d;
-      for (let j = 1; j < sampleEvery && i + j < points.length; j++) {
-        depths[i + j] = d;
-      }
-      if (i % (sampleEvery * 5) === 0) draw();
-      await new Promise((r) => setTimeout(r, 50));
-    }
-    draw();
-  }
-
-  function renderDepthAxis() {
-    depthAxisEl.innerHTML = DEPTH_MARKS.map((m) => {
-      const pct = (m / MAX_DEPTH) * 100;
-      return `<span class="strip-depth-tick" style="top:${pct}%">${(m / 1000).toFixed(0)}k м</span>`;
-    }).join('');
-  }
-
   function updateHud() {
     if (!routeData || !hudEl) return;
     const p = routeData.points[activeIndex];
@@ -325,12 +391,12 @@ export function createStripView(container, callbacks) {
 
     hudEl.querySelector('[data-hud-dist]').textContent = `${Math.round(p.distanceNm).toLocaleString('ru-RU')} ММ (${pct}%)`;
     hudEl.querySelector('[data-hud-depth]').textContent =
-      depth != null ? `${Math.round(Math.abs(depth)).toLocaleString('ru-RU')} м` : 'глубина…';
+      depth != null ? `${Math.round(Math.abs(depth)).toLocaleString('ru-RU')} м` : '…';
     hudEl.querySelector('[data-hud-zone]').innerHTML =
       z ? `<span class="zone-dot" style="background:${z.color}"></span>${z.label || z.labelShort}` : 'зона…';
   }
 
-  function updateProbe(e, idx) {
+  function updateProbe(idx) {
     if (!routeData || idx == null) {
       probeEl.hidden = true;
       return;
@@ -354,9 +420,10 @@ export function createStripView(container, callbacks) {
       const x = nmToX(pt.distanceNm);
       const country = COUNTRY_NAMES[wp.country] || wp.country || '';
       const flip = idx % 2 === 1 ? ' flip' : '';
-      const active = pt === points[activeIndex] ? ' active' : '';
+      const ptIdx = points.indexOf(pt);
+      const active = ptIdx === activeIndex ? ' active' : '';
       return `
-        <button type="button" class="strip-marker strip-wp${flip}${active}" style="left:${x}px" data-wp-idx="${points.indexOf(pt)}" title="${wp.note || ''}">
+        <button type="button" class="strip-marker strip-wp${flip}${active}" style="left:${x}px" data-wp-idx="${ptIdx}" title="${wp.note || ''}">
           <span class="strip-wp-num">${idx + 1}</span>
           <span class="strip-wp-icon">${WP_ICON[wp.type] || '📍'}</span>
           <span class="strip-wp-name">${wp.name}</span>
@@ -412,9 +479,8 @@ export function createStripView(container, callbacks) {
   function drawCanvas() {
     if (!routeData || !ctx) return;
     const { points, totalNm } = routeData;
-    const width = Math.ceil(totalNm * pxPerNm);
-    canvas.width = width;
-    overlayEl.style.width = `${width}px`;
+    const width = Math.max(1, Math.ceil(totalNm * pxPerNm));
+    syncCanvasSize(width);
 
     ctx.clearRect(0, 0, width, CANVAS_H);
 
@@ -444,7 +510,7 @@ export function createStripView(container, callbacks) {
       const x0 = nmToX(points[i - 1].distanceNm);
       const x1 = nmToX(points[i].distanceNm);
       ctx.fillStyle = getZoneAt(i).fill;
-      ctx.fillRect(x0, zoneTop, x1 - x0 + 1, zoneBandHeight);
+      ctx.fillRect(x0, zoneTop, Math.max(1, x1 - x0), zoneBandHeight);
     }
 
     ctx.strokeStyle = 'rgba(255,255,255,0.2)';
@@ -462,55 +528,50 @@ export function createStripView(container, callbacks) {
       ctx.setLineDash([]);
     });
 
-    ctx.beginPath();
-    let started = false;
-    for (let i = 0; i < points.length; i++) {
-      const x = nmToX(points[i].distanceNm);
-      const y = depthToY(depths[i]);
-      if (!started) { ctx.moveTo(x, y); started = true; }
-      else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = '#4fc3f7';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-    ctx.lineTo(width, CANVAS_H);
-    ctx.lineTo(0, CANVAS_H);
-    ctx.closePath();
-    const grad = ctx.createLinearGradient(0, profileTop, 0, CANVAS_H);
-    grad.addColorStop(0, 'rgba(79, 195, 247, 0.45)');
-    grad.addColorStop(1, 'rgba(7, 18, 32, 0.95)');
-    ctx.fillStyle = grad;
-    ctx.fill();
-
-    const depthStep = 500;
-    let lastNm = -depthStep;
-    ctx.font = 'bold 12px "JetBrains Mono", monospace';
-    for (let i = 0; i < points.length; i++) {
-      const p = points[i];
-      if (p.distanceNm - lastNm < depthStep && i !== points.length - 1) continue;
-      lastNm = p.distanceNm;
-      const depth = depths[i];
-      if (depth == null) continue;
-      const x = nmToX(p.distanceNm);
-      const y = depthToY(depth);
-      ctx.fillStyle = '#fff';
+    if (depths.length === points.length) {
       ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.moveTo(nmToX(points[0].distanceNm), depthToY(depths[0]));
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(nmToX(points[i].distanceNm), depthToY(depths[i]));
+      }
+      ctx.strokeStyle = '#4fc3f7';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.lineTo(nmToX(points[points.length - 1].distanceNm), CANVAS_H);
+      ctx.lineTo(nmToX(points[0].distanceNm), CANVAS_H);
+      ctx.closePath();
+      const grad = ctx.createLinearGradient(0, profileTop, 0, CANVAS_H);
+      grad.addColorStop(0, 'rgba(79, 195, 247, 0.45)');
+      grad.addColorStop(1, 'rgba(7, 18, 32, 0.95)');
+      ctx.fillStyle = grad;
       ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
-      ctx.fillText(`${Math.round(Math.abs(depth))} м`, x + 6, y + 4);
+
+      const depthStep = 500;
+      let lastNm = -depthStep;
+      ctx.font = 'bold 12px "JetBrains Mono", monospace';
+      for (let i = 0; i < points.length; i++) {
+        const p = points[i];
+        if (p.distanceNm - lastNm < depthStep && i !== points.length - 1) continue;
+        lastNm = p.distanceNm;
+        const depth = depths[i];
+        const x = nmToX(p.distanceNm);
+        const y = depthToY(depth);
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.fillText(`${Math.round(Math.abs(depth))} м`, x + 6, y + 4);
+      }
     }
 
     ctx.beginPath();
-    for (let i = 0; i < points.length; i++) {
-      const x = nmToX(points[i].distanceNm);
-      if (i === 0) ctx.moveTo(x, trackY);
-      else ctx.lineTo(x, trackY);
+    ctx.moveTo(nmToX(points[0].distanceNm), trackY);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(nmToX(points[i].distanceNm), trackY);
     }
-    const trackGrad = ctx.createLinearGradient(0, trackY - 4, 0, trackY + 4);
-    trackGrad.addColorStop(0, '#00e5ff');
-    trackGrad.addColorStop(1, '#0097a7');
-    ctx.strokeStyle = trackGrad;
+    ctx.strokeStyle = '#00e5ff';
     ctx.lineWidth = 5;
     ctx.shadowColor = '#00e5ff';
     ctx.shadowBlur = 12;
@@ -566,9 +627,11 @@ export function createStripView(container, callbacks) {
     setRoute(data, wps) {
       ensureDom();
       renderDepthAxis();
+      depthLoadToken++;
       routeData = data;
       waypoints = wps;
       activeIndex = Math.min(activeIndex, Math.max(0, data.points.length - 1));
+      initDepthsFromEstimate();
       draw();
       loadDepths();
     },

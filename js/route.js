@@ -125,9 +125,16 @@ export function buildRoute(waypoints = WAYPOINTS, stepNm = 20) {
   };
 }
 
+/** Детерминированный шум для fallback-глубины (без Math.random) */
+function depthNoise(lat, lon) {
+  const x = Math.sin(lat * 12.9898 + lon * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
 /** Приблизительная глубина по эвристике (fallback без API) */
 export function estimateDepth(lat, lon) {
   const absLat = Math.abs(lat);
+  const n = depthNoise(lat, lon);
   const oceanic =
     (absLat < 5 && Math.abs(lon) > 30) ||
     (absLat < 10 && lon < -20) ||
@@ -135,14 +142,14 @@ export function estimateDepth(lat, lon) {
     (absLat < 20 && lon > 140 && lon < 180) ||
     (absLat < 10 && lon > 60 && lon < 100);
 
-  if (oceanic) return -(3500 + Math.random() * 1500);
+  if (oceanic) return -(3500 + n * 1500);
 
   const coastal =
     absLat > 30 ||
     (absLat > 20 && lon > -10 && lon < 40) ||
     Math.abs(lon) < 5;
 
-  if (coastal) return -(200 + Math.random() * 2800);
+  if (coastal) return -(200 + n * 2800);
 
-  return -(1500 + Math.random() * 2500);
+  return -(1500 + n * 2500);
 }

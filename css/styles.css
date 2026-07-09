@@ -625,8 +625,8 @@ progress {
   flex: 0 0 52px;
   background: #071220;
   border-right: 1px solid var(--border);
-  margin-top: 0;
   height: 480px;
+  flex-shrink: 0;
 }
 
 .strip-depth-tick {
@@ -638,6 +638,7 @@ progress {
   font-weight: 700;
   color: rgba(79, 195, 247, 0.9);
   white-space: nowrap;
+  pointer-events: none;
 }
 
 .strip-scroll {
@@ -668,6 +669,7 @@ progress {
 .strip-canvas {
   display: block;
   height: 480px;
+  vertical-align: top;
 }
 
 .strip-overlay {
