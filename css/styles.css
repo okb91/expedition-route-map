@@ -419,6 +419,48 @@ progress {
   text-transform: uppercase;
 }
 
+.poi-ref {
+  margin: 0.25rem 0 0 !important;
+  font-size: 0.65rem !important;
+  color: var(--accent) !important;
+  font-family: var(--mono);
+  line-height: 1.35 !important;
+}
+
+.poi-count {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--accent);
+  font-weight: 400;
+}
+
+.poi-list-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.popup-poi-type {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--accent-pink);
+  text-transform: uppercase;
+}
+
+.popup-ref {
+  display: block;
+  margin-top: 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--accent);
+}
+
+.popup-doi {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+}
+
 .strip-section {
   border-top: 1px solid var(--border);
   background: var(--bg-panel);

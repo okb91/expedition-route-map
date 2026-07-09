@@ -1,4 +1,5 @@
 import { WAYPOINTS, POIS } from './route.js';
+import { POI_TYPES } from './pois.js';
 import { classifyRoute, ZONE_TYPES } from './zones.js';
 import { createMap } from './map.js';
 import { createStripView } from './strip.js';
@@ -88,14 +89,19 @@ function renderWaypointList(waypoints, routeData, editor, mapApi) {
 function renderPoiList() {
   const list = document.getElementById('poi-list');
   if (!list) return;
+
   list.innerHTML = POIS.map(
     (poi) => `
-    <li class="poi-item">
+    <li class="poi-item" data-poi-id="${poi.id}">
       <strong>${poi.name}</strong>
-      <span class="poi-type">${poi.type}</span>
+      <span class="poi-type">${POI_TYPES[poi.type] || poi.type}</span>
       <p>${poi.note}</p>
+      ${poi.ref ? `<p class="poi-ref">${poi.ref}</p>` : ''}
     </li>`
   ).join('');
+
+  const countEl = document.getElementById('poi-count');
+  if (countEl) countEl.textContent = `${POIS.length} станций`;
 }
 
 function renderLegend() {

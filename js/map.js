@@ -1,6 +1,7 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { POIS } from './route.js';
+import { POI_TYPES } from './pois.js';
 import { ZONE_TYPES } from './zones.js';
 import { splitRouteForMap } from './geo.js';
 
@@ -263,7 +264,16 @@ export function createMap(containerId, routePoints, editorCallbacks) {
   const poiLayer = L.layerGroup();
   POIS.forEach((poi) => {
     const marker = L.marker([poi.lat, poi.lon], { icon: poiIcon });
-    marker.bindPopup(`<strong>🔬 ${poi.name}</strong><br/><em>${poi.note}</em>`);
+    const typeLabel = POI_TYPES[poi.type] || poi.type;
+    const refLine = poi.ref ? `<br/><span class="popup-ref">${poi.ref}</span>` : '';
+    const doiLine = poi.doi
+      ? `<br/><a class="popup-doi" href="https://doi.org/${poi.doi}" target="_blank" rel="noopener">doi:${poi.doi}</a>`
+      : '';
+    marker.bindPopup(`
+      <strong>🔬 ${poi.name}</strong>
+      <span class="popup-poi-type">${typeLabel}</span><br/>
+      <em>${poi.note}</em>${refLine}${doiLine}
+    `);
     poiLayer.addLayer(marker);
   });
 

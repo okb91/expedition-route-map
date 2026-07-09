@@ -18,17 +18,7 @@ export const WAYPOINTS = [
   { id: 'turkey', name: 'Турция', nameEn: 'Turkey', country: 'TR', lat: 36.80, lon: 30.70, type: 'port', note: 'Финиш: Средиземноморье' },
 ];
 
-/** Точки интереса для океанологических измерений */
-export const POIS = [
-  { id: 'poi-canaries', name: 'Канарское upwelling', lat: 28.5, lon: -16.0, type: 'upwelling', note: 'Зона подъёма холодных вод' },
-  { id: 'poi-equator-atl', name: 'Экватор (Атлантика)', lat: 0, lon: -25, type: 'equator', note: 'ITCZ, солёность / температурный профиль' },
-  { id: 'poi-hydro-thermal', name: 'Срединно-атлантический хребет', lat: 15, lon: -45, type: 'ridge', note: 'Hydrothermal vents, батиметрия' },
-  { id: 'poi-equator-pac', name: 'Экватор (Тихий океан)', lat: 0, lon: -140, type: 'equator', note: 'ENSO monitoring corridor' },
-  { id: 'poi-mariana-approach', name: 'Западная тихоокеанская яма', lat: 12, lon: 145, type: 'deep', note: 'Глубоководный профиль (>6000 м)' },
-  { id: 'poi-indian-gyre', name: 'Центр антициклона IO', lat: -15, lon: 80, type: 'gyre', note: 'Пластик / солёность / O2' },
-  { id: 'poi-arabian-omz', name: 'Аравийская OMZ', lat: 18, lon: 62, type: 'omz', note: 'Кислородный минимум' },
-  { id: 'poi-bab-el-mandeb', name: 'Bab el-Mandeb', lat: 12.58, lon: 43.33, type: 'strait', note: 'Обмен вод Red Sea — Indian Ocean' },
-];
+export { POIS, POI_TYPES } from './pois.js';
 
 const NM_TO_KM = 1.852;
 const EARTH_RADIUS_KM = 6371;
