@@ -1,0 +1,606 @@
+:root {
+  --bg: #060d18;
+  --bg-panel: #0c1829;
+  --bg-elevated: #122035;
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e8eef7;
+  --text-muted: #8fa3bf;
+  --accent: #00e5ff;
+  --accent-pink: #ff4081;
+  --font: 'Manrope', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem 1.5rem;
+  padding: 1.25rem 1.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #0a1525 0%, var(--bg) 100%);
+}
+
+.edit-hint {
+  flex-basis: 100%;
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  color: var(--accent);
+  min-height: 1.1em;
+}
+
+.header h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  max-width: 900px;
+}
+
+.route-stats {
+  margin: 0.5rem 0 0;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0, 229, 255, 0.12);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-muted {
+  color: var(--text-muted);
+}
+
+.btn-xs, .btn-sm {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  font-family: var(--font);
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.btn-sm { padding: 0.35rem 0.6rem; font-size: 0.75rem; }
+
+.btn-xs:hover, .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-danger, .btn-xs.btn-danger { border-color: rgba(231, 76, 60, 0.5); color: #e74c3c; }
+
+.wp-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 0;
+  min-height: 520px;
+}
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.badge {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.map-panel {
+  display: flex;
+  flex-direction: column;
+  border-left: none;
+  border-top: none;
+}
+
+.map {
+  flex: 1;
+  min-height: 460px;
+  background: #0a1628;
+}
+
+.zone-legend {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.legend-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 2px solid;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.legend-item strong {
+  display: block;
+  font-size: 0.75rem;
+}
+
+.legend-item p {
+  margin: 0.15rem 0 0;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  border-right: none;
+  border-top: none;
+  overflow-y: auto;
+  max-height: calc(100vh - 120px);
+}
+
+.sidebar .panel {
+  border-left: none;
+  border-top: none;
+  padding: 0.85rem 1rem;
+}
+
+.sidebar h2 {
+  margin: 0 0 0.65rem;
+  font-size: 0.88rem;
+}
+
+.panel-desc {
+  margin: -0.35rem 0 0.65rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.info-panel {
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  padding: 0.85rem;
+  min-height: 90px;
+}
+
+.info-grid {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.info-label {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.info-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.info-value small {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.zone-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 0.35rem;
+}
+
+progress {
+  width: 100%;
+  margin-top: 0.65rem;
+  accent-color: var(--accent);
+}
+
+.progress-text {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.waypoint-list,
+.poi-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wp-item {
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.wp-item:hover {
+  background: rgba(0, 229, 255, 0.05);
+}
+
+.wp-num {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--accent);
+  width: 1.2rem;
+  flex-shrink: 0;
+}
+
+.wp-body strong {
+  font-size: 0.82rem;
+}
+
+.wp-dist {
+  float: right;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.wp-body p,
+.poi-item p {
+  margin: 0.2rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.poi-item {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.poi-item strong {
+  font-size: 0.8rem;
+}
+
+.poi-type {
+  float: right;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--accent-pink);
+  text-transform: uppercase;
+}
+
+.strip-section {
+  border-top: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.strip-head {
+  padding: 0.85rem 1.25rem;
+}
+
+.strip-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.strip-ruler {
+  display: flex;
+  gap: 1rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.strip-container {
+  padding: 0 1rem 1rem;
+}
+
+.strip-scroll {
+  position: relative;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #0a1628;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  height: 300px;
+  cursor: crosshair;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) var(--bg-elevated);
+}
+
+.strip-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.strip-scroll::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 5px;
+}
+
+.strip-canvas {
+  display: block;
+  height: 280px;
+}
+
+.strip-cursor {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--accent-pink);
+  pointer-events: none;
+  transform: translateX(-1px);
+  box-shadow: 0 0 8px var(--accent-pink);
+}
+
+.footer {
+  padding: 0.85rem 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.footer p {
+  margin: 0;
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  background: #0a1628;
+  font-family: var(--font);
+}
+
+.leaflet-container.map-add-mode {
+  cursor: crosshair;
+}
+
+.leaflet-container.map-edit-mode .waypoint-marker.editable {
+  cursor: grab;
+}
+
+.custom-layer-control {
+  background: var(--bg-elevated) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  padding: 0.5rem 0.65rem !important;
+  max-height: 420px;
+  overflow-y: auto;
+  font-size: 0.78rem;
+}
+
+.layer-block + .layer-block {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.layer-block-title {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.2rem 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.layer-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.layer-swatch.dashed {
+  background: transparent !important;
+  border: 2px dashed #bdc3c7;
+}
+
+.layer-row input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.waypoint-marker .wp-dot {
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.waypoint-marker.editable .wp-dot {
+  border-color: #ff4081;
+  box-shadow: 0 0 8px rgba(255, 64, 129, 0.6);
+}
+
+.wp-idx {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: #0a1628;
+  line-height: 1;
+}
+
+.wp-edit-popup label {
+  display: block;
+  margin: 0.35rem 0;
+  font-size: 0.75rem;
+}
+
+.wp-edit-popup input,
+.wp-edit-popup textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.2rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 0.3rem;
+  font-family: var(--font);
+  font-size: 0.78rem;
+}
+
+.wp-edit-popup textarea { min-height: 48px; resize: vertical; }
+
+.wp-popup-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.poi-marker .poi-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--accent-pink);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  transform: rotate(45deg);
+}
+
+.leaflet-popup-content-wrapper {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-radius: 8px;
+}
+
+.leaflet-popup-tip {
+  background: var(--bg-elevated);
+}
+
+.popup-coords {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    max-height: none;
+  }
+
+  .zone-legend {
+    grid-template-columns: 1fr;
+  }
+
+  .header {
+    flex-direction: column;
+  }
+}

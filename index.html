@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Кругосветная экспедиция — карта маршрута</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-brand">
+      <h1>Кругосветная океанологическая экспедиция</h1>
+      <p class="subtitle">Марокко → Кабо-Верде → Антильские о-ва → Панама → Галапагосы → Таити → Фиджи → Торресов пролив → Таиланд → Шри-Ланка → Оман → Джибути → Египет → Турция</p>
+      <p class="route-stats" id="route-stats">Загрузка маршрута…</p>
+    </div>
+    <div class="header-actions">
+      <label class="toggle">
+        <input type="checkbox" id="toggle-pois" checked />
+        <span>Точки интереса (POI)</span>
+      </label>
+      <button class="btn" id="btn-edit-mode">✎ Редактировать маршрут</button>
+      <button class="btn" id="btn-add-waypoint" disabled title="Добавить точку на карту">+ Точка</button>
+      <button class="btn btn-muted" id="btn-reset-route" title="Сбросить к исходному маршруту">↺</button>
+      <button class="btn" id="btn-start">Старт</button>
+      <button class="btn" id="btn-end">Финиш</button>
+    </div>
+    <p class="edit-hint" id="edit-hint"></p>
+  </header>
+
+  <main class="layout">
+    <section class="panel map-panel">
+      <div class="panel-head">
+        <h2>Географическая карта</h2>
+        <span class="badge">GEBCO + Marine Regions</span>
+      </div>
+      <div id="map" class="map"></div>
+      <div class="zone-legend" id="zone-legend"></div>
+    </section>
+
+    <aside class="sidebar">
+      <section class="panel info-panel-wrap">
+        <h2>Текущая позиция</h2>
+        <div id="info-panel" class="info-panel">Выберите точку на развёртке</div>
+        <progress id="zone-progress" max="100" value="0"></progress>
+        <p class="progress-text" id="zone-progress-text"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Контрольные точки</h2>
+        <ul class="waypoint-list" id="waypoint-list"></ul>
+      </section>
+
+      <section class="panel">
+        <h2>Точки интереса (POI)</h2>
+        <p class="panel-desc">Рекомендуемые станции для океанологических измерений</p>
+        <ul class="poi-list" id="poi-list"></ul>
+      </section>
+    </aside>
+  </main>
+
+  <section class="strip-section">
+    <div class="panel-head strip-head">
+      <div>
+        <h2>Линейная развёртка маршрута</h2>
+        <p class="strip-hint">Прокручивайте слева направо — непрерывная линия пути с батиметрией и морскими зонами</p>
+      </div>
+      <div class="strip-ruler">
+        <span>0 ММ</span>
+        <span>→ расстояние по маршруту →</span>
+      </div>
+    </div>
+    <div id="strip-container" class="strip-container"></div>
+  </section>
+
+  <footer class="footer">
+    <p>
+      Батиметрия: <a href="https://www.gebco.net/" target="_blank" rel="noopener">GEBCO</a> ·
+      Морские зоны: <a href="https://www.marineregions.org/" target="_blank" rel="noopener">Marine Regions (VLIZ)</a> ·
+      Данные UNCLOS: территориальное море (12 ММ), ИЭЗ (200 ММ), открытое море
+    </p>
+  </footer>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
