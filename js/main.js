@@ -212,7 +212,7 @@ async function init() {
     onPositionChange(p, zone, routeData) {
       const data = editor.getRouteData();
       updateInfoPanel(p, zone, data);
-      mapApi.setCursorPosition(p.lat, p.lon);
+      mapApi.setCursorPosition(p);
       mapApi.panTo(p.lat, p.lon);
     },
   });
@@ -223,6 +223,7 @@ async function init() {
     mapApi.togglePois(e.target.checked);
   });
   mapApi.togglePois(document.getElementById('toggle-pois')?.checked ?? true);
+  mapApi.toggleNav(true);
 
   document.getElementById('btn-start')?.addEventListener('click', () => {
     stripApi.scrollToIndex(0);

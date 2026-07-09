@@ -1,6 +1,9 @@
 import { POIS, POI_TYPES } from './pois.js';
 import { ZONE_TYPES, queryGebcoDepth } from './zones.js';
 import { estimateDepth, haversineKm } from './route.js';
+import { loadCoastline, formatDistanceToShore, nearestCoast } from './coastline.js';
+import { bearingDeg } from './geo.js';
+import { NAV_FEATURES, NAV_ICONS, NAV_TYPES, nearestNavFeature } from './navFeatures.js';
 
 const COUNTRY_NAMES = {
   MA: 'Марокко', CV: 'Кабо-Верде', GP: 'Гваделупа', PA: 'Панама', EC: 'Эcuador',
@@ -35,6 +38,9 @@ export function createStripView(container, callbacks) {
   let playOn = false;
   let depthLoadToken = 0;
   let drawScheduled = false;
+  let coastProfile = [];
+  let coastLoadToken = 0;
+  let contextEl = null;
 
   const CANVAS_H = 480;
   const profileHeight = 130;
@@ -58,8 +64,10 @@ export function createStripView(container, callbacks) {
         <div class="strip-hud-stats">
           <span class="strip-stat" data-hud-dist>0 ММ</span>
           <span class="strip-stat" data-hud-depth>— м</span>
+          <span class="strip-stat" data-hud-shore>—</span>
           <span class="strip-stat" data-hud-zone>—</span>
         </div>
+        <p class="strip-captain-tip" data-hud-captain hidden></p>
         <div class="strip-controls">
           <button type="button" class="strip-btn" data-zoom-out title="Уменьшить">−</button>
           <span class="strip-zoom-label" data-zoom-label>100%</span>
@@ -78,6 +86,7 @@ export function createStripView(container, callbacks) {
           <canvas class="strip-canvas" height="${CANVAS_H}"></canvas>
           <div class="strip-overlay"></div>
           <div class="strip-probe" hidden></div>
+          <div class="strip-context" data-context hidden></div>
         </div>
       </div>
     `;
@@ -88,6 +97,7 @@ export function createStripView(container, callbacks) {
     ctx = canvas.getContext('2d');
     overlayEl = scrollWrap.querySelector('.strip-overlay');
     probeEl = scrollWrap.querySelector('.strip-probe');
+    contextEl = scrollWrap.querySelector('[data-context]');
     hudEl = root.querySelector('.strip-hud');
     depthAxisEl = root.querySelector('[data-depth-axis]');
 
@@ -127,6 +137,7 @@ export function createStripView(container, callbacks) {
     scrollWrap.addEventListener('mouseleave', () => {
       hoverIndex = null;
       probeEl.hidden = true;
+      hideContext();
     });
 
     scrollWrap.addEventListener('keydown', (e) => {
@@ -192,6 +203,173 @@ export function createStripView(container, callbacks) {
     const z = zoneResults?.[i];
     if (!z) return ZONE_TYPES.unknown;
     return ZONE_TYPES[z.zone] || ZONE_TYPES.unknown;
+  }
+
+  async function rebuildCoastProfile() {
+    if (!routeData) return;
+    const token = ++coastLoadToken;
+    const segments = await loadCoastline();
+    if (token !== coastLoadToken || !routeData) return;
+
+    const points = routeData.points;
+    const step = Math.max(1, Math.floor(28 / pxPerNm));
+    const sparse = [];
+
+    for (let i = 0; i < points.length; i += step) {
+      if (token !== coastLoadToken) return;
+      const p = points[i];
+      const prev = points[Math.max(0, i - 1)];
+      const next = points[Math.min(points.length - 1, i + 1)];
+      const course = bearingDeg(prev.lat, prev.lon, next.lat, next.lon);
+      const coast = nearestCoast(p.lat, p.lon, segments);
+      let side = 'none';
+      if (coast.distanceKm < Infinity) {
+        const rel = (coast.bearing - course + 360) % 360;
+        side = rel <= 180 ? 'starboard' : 'port';
+      }
+      sparse.push({
+        i,
+        distanceNm: p.distanceNm,
+        distanceKm: coast.distanceKm,
+        side,
+        coastName: coast.distanceKm < 120 ? guessLocalName(p.lat, p.lon) : null,
+      });
+    }
+
+    if (token !== coastLoadToken) return;
+    coastProfile = interpolateCoastSparse(points, sparse);
+    scheduleDraw();
+  }
+
+  function guessLocalName(lat, lon) {
+    if (lat > 30 && lon > -10 && lon < 40) return 'Средиземноморский берег';
+    if (lat > 5 && lon > 72 && lon < 82) return 'Индийский субконтинент';
+    if (lat > -20 && lon > 140 && lon < 155) return 'Австралия';
+    if (lat > -20 && lon > 175) return 'Острова Фиджи';
+    if (lat > -20 && lon < -140) return 'Полинезия';
+    if (lat > -5 && lon > -95 && lon < -85) return 'Эcuador / Galápagos';
+    if (lat > 5 && lon > -85 && lon < -75) return 'Панама';
+    if (lat > 10 && lon > -65 && lon < -55) return 'Карибы';
+    if (lat > 10 && lon > -30 && lon < -20) return 'Кабо-Верде';
+    if (lat > 30 && lon > -10 && lon < 0) return 'Магриб';
+    if (lat > 20 && lon > 50 && lon < 65) return 'Оман';
+    if (lat > 10 && lon > 40 && lon < 50) return 'Африканский рог';
+    return null;
+  }
+
+  function interpolateCoastSparse(points, sparse) {
+    if (!sparse.length) return points.map(() => ({ distanceKm: Infinity, side: 'none', coastName: null }));
+    const sorted = [...sparse].sort((a, b) => a.distanceNm - b.distanceNm);
+    return points.map((p) => {
+      const nm = p.distanceNm;
+      if (nm <= sorted[0].distanceNm) return { ...sorted[0] };
+      if (nm >= sorted[sorted.length - 1].distanceNm) return { ...sorted[sorted.length - 1] };
+      for (let s = 0; s < sorted.length - 1; s++) {
+        const a = sorted[s];
+        const b = sorted[s + 1];
+        if (nm >= a.distanceNm && nm <= b.distanceNm) {
+          const t = (nm - a.distanceNm) / (b.distanceNm - a.distanceNm);
+          const dist =
+            a.distanceKm === Infinity
+              ? b.distanceKm
+              : b.distanceKm === Infinity
+                ? a.distanceKm
+                : a.distanceKm + t * (b.distanceKm - a.distanceKm);
+          return {
+            distanceKm: dist,
+            side: t < 0.5 ? a.side : b.side,
+            coastName: t < 0.5 ? a.coastName : b.coastName,
+          };
+        }
+      }
+      return { distanceKm: Infinity, side: 'none', coastName: null };
+    });
+  }
+
+  function drawCoastSilhouette(points, width) {
+    if (!coastProfile.length) return;
+
+    const horizon = trackY - 6;
+    const maxDistKm = Math.max(40, 280 - pxPerNm * 22);
+    const samplePx = Math.max(2, Math.floor(pxPerNm * 4));
+    const topPts = [];
+
+    for (let x = 0; x <= width; x += samplePx) {
+      const idx = xToIndex(x);
+      const cp = coastProfile[idx];
+      if (!cp || cp.distanceKm === Infinity) {
+        topPts.push([x, horizon]);
+        continue;
+      }
+      const prox = Math.max(0, 1 - cp.distanceKm / maxDistKm);
+      const jag = 1 + 0.12 * Math.sin(x * 0.04 + idx * 0.5);
+      const h = prox * (horizon - 20) * jag;
+      topPts.push([x, horizon - h]);
+    }
+
+    if (topPts.length < 2) return;
+
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    for (const [x, y] of topPts) ctx.lineTo(x, y);
+    ctx.lineTo(width, 0);
+    ctx.closePath();
+    const landGrad = ctx.createLinearGradient(0, 0, 0, horizon);
+    landGrad.addColorStop(0, '#1a3d2a');
+    landGrad.addColorStop(0.55, '#2d5a3d');
+    landGrad.addColorStop(1, '#3d7a52');
+    ctx.fillStyle = landGrad;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(topPts[0][0], topPts[0][1]);
+    for (const [x, y] of topPts) ctx.lineTo(x, y);
+    ctx.strokeStyle = 'rgba(180, 220, 160, 0.85)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.font = 'bold 11px "Manrope", sans-serif';
+    let lastLabelX = -200;
+    for (let x = 0; x <= width; x += samplePx * 4) {
+      const idx = xToIndex(x);
+      const cp = coastProfile[idx];
+      if (!cp?.coastName || cp.distanceKm > maxDistKm * 0.65) continue;
+      if (x - lastLabelX < 90) continue;
+      lastLabelX = x;
+      ctx.fillStyle = 'rgba(220, 255, 200, 0.9)';
+      ctx.fillText(cp.coastName, x + 4, topPts.find((p) => p[0] >= x)?.[1] - 6 ?? 18);
+    }
+  }
+
+  function navFeaturesForStrip(points) {
+    const minPx = pxPerNm >= 7 ? 48 : pxPerNm >= 4 ? 64 : 100;
+    const typesAlways = new Set(['strait', 'hazard', 'port', 'channel', 'reef']);
+    const placed = NAV_FEATURES.map((f) => ({
+      ...f,
+      distanceNm: nearestRouteDistanceNm(points, f.lat, f.lon),
+    })).sort((a, b) => a.distanceNm - b.distanceNm);
+
+    let lastX = -999;
+    return placed.filter((f, i) => {
+      const x = nmToX(f.distanceNm);
+      if (x - lastX < minPx) return false;
+      if (pxPerNm < 4 && !typesAlways.has(f.type)) return false;
+      lastX = x;
+      return true;
+    });
+  }
+
+  function getContextForIndex(idx) {
+    const p = routeData?.points?.[idx];
+    if (!p) return null;
+    const cp = coastProfile[idx];
+    const nav = nearestNavFeature(p.lat, p.lon, 150);
+    const shore = cp ? formatDistanceToShore(cp.distanceKm) : '…';
+    const side =
+      cp?.side === 'port' ? 'берег слева (port)' :
+      cp?.side === 'starboard' ? 'берег справа (starboard)' :
+      'открытая вода';
+    return { shore, side, nav, cp, p };
   }
 
   function initDepthsFromEstimate() {
@@ -323,6 +501,7 @@ export function createStripView(container, callbacks) {
     scrollWrap.scrollLeft = scrollRatio * nmToX(routeData?.totalNm ?? 0);
     const anchorXAfter = anchorNm * pxPerNm;
     scrollWrap.scrollLeft += anchorXAfter - anchorXBefore;
+    rebuildCoastProfile();
     root.querySelector('[data-zoom-label]').textContent = `${Math.round((pxPerNm / 5) * 100)}%`;
   }
 
@@ -342,9 +521,9 @@ export function createStripView(container, callbacks) {
         stopPlay();
         return;
       }
-      setActiveIndex(activeIndex + Math.max(1, Math.floor(4 * playSpeed)));
+      setActiveIndex(activeIndex + Math.max(1, playSpeed));
       scrollToActive();
-    }, 120);
+    }, 480);
   }
 
   function stopPlay() {
@@ -392,6 +571,20 @@ export function createStripView(container, callbacks) {
     hudEl.querySelector('[data-hud-dist]').textContent = `${Math.round(p.distanceNm).toLocaleString('ru-RU')} ММ (${pct}%)`;
     hudEl.querySelector('[data-hud-depth]').textContent =
       depth != null ? `${Math.round(Math.abs(depth)).toLocaleString('ru-RU')} м` : '…';
+    const ctxInfo = getContextForIndex(activeIndex);
+    if (ctxInfo) {
+      hudEl.querySelector('[data-hud-shore]').textContent = `🏝 ${ctxInfo.shore}`;
+      const tipEl = hudEl.querySelector('[data-hud-captain]');
+      const tip = ctxInfo.nav?.captain || ctxInfo.nav?.note || ctxInfo.cp?.coastName;
+      if (tip) {
+        tipEl.hidden = false;
+        tipEl.textContent = ctxInfo.nav
+          ? `${NAV_ICONS[ctxInfo.nav.type] || '⚓'} ${ctxInfo.nav.name}: ${tip}`
+          : `💬 ${tip}`;
+      } else {
+        tipEl.hidden = true;
+      }
+    }
     hudEl.querySelector('[data-hud-zone]').innerHTML =
       z ? `<span class="zone-dot" style="background:${z.color}"></span>${z.label || z.labelShort}` : 'зона…';
   }
@@ -404,13 +597,38 @@ export function createStripView(container, callbacks) {
     const p = routeData.points[idx];
     const depth = depths[idx];
     const z = zoneResults?.[idx];
+    const ctxInfo = getContextForIndex(idx);
     probeEl.hidden = false;
     probeEl.style.left = `${nmToX(p.distanceNm)}px`;
     probeEl.innerHTML = `
       <strong>${Math.round(p.distanceNm).toLocaleString('ru-RU')} ММ</strong>
-      <span>${depth != null ? `${Math.round(Math.abs(depth))} м` : '…'}</span>
+      <span>🌊 ${depth != null ? `${Math.round(Math.abs(depth))} м` : '…'}</span>
+      <span>🏝 ${ctxInfo?.shore || '…'}</span>
       <span>${z?.labelShort || z?.label || '—'}</span>
     `;
+
+    if (contextEl && ctxInfo) {
+      const showDetail = pxPerNm >= 3.5;
+      contextEl.hidden = !showDetail;
+      if (showDetail) {
+        contextEl.style.left = `${nmToX(p.distanceNm)}px`;
+        const navBlock = ctxInfo.nav
+          ? `<div class="strip-ctx-nav"><strong>${NAV_ICONS[ctxInfo.nav.type]} ${ctxInfo.nav.name}</strong>
+             <span class="strip-ctx-type">${NAV_TYPES[ctxInfo.nav.type]}</span>
+             <p>${ctxInfo.nav.note}</p>
+             <em class="strip-ctx-captain">⚓ Капитану: ${ctxInfo.nav.captain}</em></div>`
+          : '';
+        contextEl.innerHTML = `
+          <div class="strip-ctx-shore">${ctxInfo.side}</div>
+          ${navBlock}
+          <div class="strip-ctx-coords">${p.lat.toFixed(2)}° ${p.lat >= 0 ? 'N' : 'S'}, ${Math.abs(p.lon).toFixed(2)}° ${p.lon >= 0 ? 'E' : 'W'}</div>
+        `;
+      }
+    }
+  }
+
+  function hideContext() {
+    if (contextEl) contextEl.hidden = true;
   }
 
   function renderOverlay(points) {
@@ -450,9 +668,24 @@ export function createStripView(container, callbacks) {
         </button>`;
     }).join('');
 
+    const navItems = navFeaturesForStrip(points);
+    let lastNavX = -999;
+    const navHtml = navItems.map((f) => {
+      const x = nmToX(f.distanceNm);
+      if (x - lastNavX < 40) return '';
+      lastNavX = x;
+      return `
+        <button type="button" class="strip-marker strip-nav" style="left:${x}px" data-nav-id="${f.id}"
+          title="${f.captain}">
+          <span class="strip-nav-icon">${NAV_ICONS[f.type] || '⚓'}</span>
+          <span class="strip-nav-name">${f.name}</span>
+        </button>`;
+    }).join('');
+
     const yachtX = nmToX(points[activeIndex]?.distanceNm ?? 0);
     overlayEl.innerHTML = `
       ${wpHtml}
+      ${navHtml}
       ${poiHtml}
       <div class="strip-yacht" style="left:${yachtX}px" aria-hidden="true">⛵</div>
     `;
@@ -474,6 +707,16 @@ export function createStripView(container, callbacks) {
         scrollToActive();
       });
     });
+    overlayEl.querySelectorAll('.strip-nav').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const f = NAV_FEATURES.find((n) => n.id === el.dataset.navId);
+        if (!f) return;
+        const idx = xToIndex(nmToX(nearestRouteDistanceNm(points, f.lat, f.lon)));
+        setActiveIndex(idx);
+        scrollToActive();
+      });
+    });
   }
 
   function drawCanvas() {
@@ -489,6 +732,8 @@ export function createStripView(container, callbacks) {
     skyGrad.addColorStop(1, '#0a1628');
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, width, trackY + 20);
+
+    drawCoastSilhouette(points, width);
 
     ctx.fillStyle = '#071220';
     ctx.fillRect(0, trackY + 20, width, CANVAS_H - trackY - 20);
@@ -632,8 +877,10 @@ export function createStripView(container, callbacks) {
       waypoints = wps;
       activeIndex = Math.min(activeIndex, Math.max(0, data.points.length - 1));
       initDepthsFromEstimate();
+      coastProfile = [];
       draw();
       loadDepths();
+      rebuildCoastProfile();
     },
 
     scrollToIndex(i) {

@@ -1,9 +1,5 @@
-/** Разбиение маршрута на сегменты без пересечения линии через всю карту (180° меридиан) */
+/** Разбиение маршрута и непрерывное отображение через антимеридиан */
 
-/**
- * Точка пересечения сегмента с антимеридианом (±180°).
- * Срабатывает при скачке долготы > 180° между соседними точками.
- */
 function antimeridianCrossing(from, to) {
   const lon1 = from.lon;
   const lat1 = from.lat;
@@ -25,10 +21,48 @@ function antimeridianCrossing(from, to) {
   };
 }
 
-/**
- * Разбить точки маршрута на сегменты для Leaflet.
- * Каждый сегмент — массив [lat, lon] в диапазоне lon ∈ [-180, 180].
- */
+/** Непрерывная долгота вдоль маршрута (без скачка ±360°) */
+export function unwrapRouteLongitudes(points) {
+  if (!points.length) return [];
+  const out = [];
+  let prevLon = points[0].lon;
+
+  for (let i = 0; i < points.length; i++) {
+    let lon = points[i].lon;
+    if (i > 0) {
+      while (lon - prevLon > 180) lon -= 360;
+      while (lon - prevLon < -180) lon += 360;
+    }
+    prevLon = lon;
+    out.push({ ...points[i], displayLon: lon });
+  }
+  return out;
+}
+
+/** Сдвинуть долготу к видимой копии мира относительно центра карты */
+export function shiftLonNearCenter(lon, centerLon) {
+  let l = lon;
+  while (l - centerLon > 180) l -= 360;
+  while (l - centerLon < -180) l += 360;
+  return l;
+}
+
+/** Координаты маршрута для Leaflet с учётом прокрутки карты */
+export function routeToDisplayLatLngs(points, centerLon) {
+  return unwrapRouteLongitudes(points).map((p) => [
+    p.lat,
+    shiftLonNearCenter(p.displayLon, centerLon),
+  ]);
+}
+
+export function displayLatLngForPoint(point, centerLon, unwrapped) {
+  const u = unwrapped ?? unwrapRouteLongitudes([point])[0];
+  return [
+    u.lat,
+    shiftLonNearCenter(u.displayLon ?? u.lon, centerLon),
+  ];
+}
+
 export function splitRouteForMap(points) {
   if (!points.length) return [];
   if (points.length === 1) return [[[points[0].lat, points[0].lon]]];
@@ -54,7 +88,6 @@ export function splitRouteForMap(points) {
   return segments;
 }
 
-/** GeoJSON FeatureCollection из сегментов */
 export function routeToMapGeoJson(points) {
   const segments = splitRouteForMap(points);
   return {
@@ -68,4 +101,14 @@ export function routeToMapGeoJson(points) {
       },
     })),
   };
+}
+
+/** Азимут между двумя точками (градусы, 0 = N) */
+export function bearingDeg(lat1, lon1, lat2, lon2) {
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }

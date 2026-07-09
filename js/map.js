@@ -3,7 +3,8 @@ import 'leaflet/dist/leaflet.css';
 import { POIS } from './route.js';
 import { POI_TYPES } from './pois.js';
 import { ZONE_TYPES } from './zones.js';
-import { splitRouteForMap } from './geo.js';
+import { routeToDisplayLatLngs, unwrapRouteLongitudes, shiftLonNearCenter } from './geo.js';
+import { NAV_FEATURES, NAV_ICONS, NAV_TYPES } from './navFeatures.js';
 
 const GEBCO_WMS = 'https://wms.gebco.net/mapserv?';
 const VLIZ_WMS = 'https://geo.vliz.be/geoserver/MarineRegions/wms';
@@ -277,6 +278,25 @@ export function createMap(containerId, routePoints, editorCallbacks) {
     poiLayer.addLayer(marker);
   });
 
+  const navIcon = L.divIcon({
+    className: 'nav-marker',
+    html: '<div class="nav-dot">⚓</div>',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+
+  const navLayer = L.layerGroup();
+  NAV_FEATURES.forEach((f) => {
+    const marker = L.marker([f.lat, f.lon], { icon: navIcon });
+    marker.bindPopup(`
+      <strong>${NAV_ICONS[f.type] || '⚓'} ${f.name}</strong>
+      <span class="popup-poi-type">${NAV_TYPES[f.type] || f.type}</span><br/>
+      <em>${f.note}</em><br/>
+      <span class="popup-captain"><b>Капитану:</b> ${f.captain}</span>
+    `);
+    navLayer.addLayer(marker);
+  });
+
   createLayerControl(
     map,
     [
@@ -292,6 +312,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
       { label: 'Маршрут', layer: routeLayerGroup, color: ROUTE_STYLE.color },
       { label: 'Контрольные точки', layer: waypointLayer, color: '#ffffff' },
       { label: 'Точки интереса (POI)', layer: poiLayer, color: '#ff4081' },
+      { label: 'Навигация / проливы', layer: navLayer, color: '#ffd54f' },
     ]
   );
 
@@ -302,13 +323,58 @@ export function createMap(containerId, routePoints, editorCallbacks) {
   let addMode = false;
   let waypoints = [];
   let markerById = new Map();
+  let currentRoutePoints = [];
+  let unwrappedRoute = [];
+
+  function redrawRouteForView() {
+    routeLayerGroup.clearLayers();
+    if (!currentRoutePoints.length) return;
+    const centerLon = map.getCenter().lng;
+    const latlngs = routeToDisplayLatLngs(currentRoutePoints, centerLon);
+    const style = { ...ROUTE_STYLE, noWrap: false, smoothFactor: 1.2 };
+    for (const offset of [-360, 0, 360]) {
+      L.polyline(
+        latlngs.map(([lat, lon]) => [lat, lon + offset]),
+        style,
+      ).addTo(routeLayerGroup);
+    }
+  }
 
   function drawRoute(points) {
-    routeLayerGroup.clearLayers();
-    const segments = splitRouteForMap(points);
-    segments.forEach((seg) => {
-      L.polyline(seg, { ...ROUTE_STYLE, noWrap: true }).addTo(routeLayerGroup);
-    });
+    currentRoutePoints = points;
+    unwrappedRoute = unwrapRouteLongitudes(points);
+    redrawRouteForView();
+  }
+
+  map.on('moveend zoomend', () => {
+    redrawRouteForView();
+    if (cursorMarker && lastCursorPoint) {
+      placeCursor(lastCursorPoint);
+    }
+  });
+
+  let lastCursorPoint = null;
+
+  function placeCursor(p) {
+    if (!p) return;
+    const centerLon = map.getCenter().lng;
+    const idx = currentRoutePoints.indexOf(p);
+    const displayLon =
+      idx >= 0 && unwrappedRoute[idx]
+        ? shiftLonNearCenter(unwrappedRoute[idx].displayLon, centerLon)
+        : shiftLonNearCenter(p.lon, centerLon);
+    const latlng = [p.lat, displayLon];
+    if (!cursorMarker) {
+      cursorMarker = L.circleMarker(latlng, {
+        radius: 8,
+        color: '#fff',
+        weight: 2,
+        fillColor: '#ff4081',
+        fillOpacity: 0.9,
+      }).addTo(map);
+    } else {
+      cursorMarker.setLatLng(latlng);
+    }
   }
 
   function bindWaypointMarker(marker, wp, index) {
@@ -401,27 +467,31 @@ export function createMap(containerId, routePoints, editorCallbacks) {
       map.getContainer().classList.toggle('map-add-mode', editMode && addMode);
     },
 
-    setCursorPosition(lat, lon) {
-      if (!cursorMarker) {
-        cursorMarker = L.circleMarker([lat, lon], {
-          radius: 8,
-          color: '#fff',
-          weight: 2,
-          fillColor: '#ff4081',
-          fillOpacity: 0.9,
-        }).addTo(map);
-      } else {
-        cursorMarker.setLatLng([lat, lon]);
-      }
+    setCursorPosition(p) {
+      lastCursorPoint = p;
+      placeCursor(p);
     },
 
     panTo(lat, lon, zoom) {
-      map.setView([lat, lon], zoom ?? map.getZoom(), { animate: true });
+      const centerLon = map.getCenter().lng;
+      const idx = currentRoutePoints.findIndex(
+        (pt) => Math.abs(pt.lat - lat) < 0.0001 && Math.abs(pt.lon - lon) < 0.0001,
+      );
+      const displayLon =
+        idx >= 0 && unwrappedRoute[idx]
+          ? shiftLonNearCenter(unwrappedRoute[idx].displayLon, centerLon)
+          : shiftLonNearCenter(lon, centerLon);
+      map.setView([lat, displayLon], zoom ?? map.getZoom(), { animate: true });
     },
 
     togglePois(visible) {
       if (visible) poiLayer.addTo(map);
       else map.removeLayer(poiLayer);
+    },
+
+    toggleNav(visible) {
+      if (visible) navLayer.addTo(map);
+      else map.removeLayer(navLayer);
     },
 
     focusWaypoint(id) {

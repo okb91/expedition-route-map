@@ -846,6 +846,109 @@ progress {
   50% { transform: translateX(-50%) translateY(-4px); }
 }
 
+.strip-captain-tip {
+  flex-basis: 100%;
+  margin: 0.35rem 0 0;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #ffe082;
+  background: rgba(255, 193, 7, 0.08);
+  border-left: 3px solid #ffd54f;
+  border-radius: 0 6px 6px 0;
+}
+
+.strip-nav {
+  top: 168px;
+  max-width: 120px;
+}
+
+.strip-nav-icon {
+  font-size: 1rem;
+  filter: drop-shadow(0 0 6px rgba(255, 213, 79, 0.8));
+}
+
+.strip-nav-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ffe082;
+  line-height: 1.15;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+
+.strip-context {
+  position: absolute;
+  top: 250px;
+  transform: translateX(-50%);
+  width: min(240px, 42vw);
+  padding: 0.55rem 0.65rem;
+  background: rgba(8, 18, 32, 0.94);
+  border: 1px solid rgba(255, 213, 79, 0.45);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text);
+  pointer-events: none;
+  z-index: 25;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+.strip-ctx-shore {
+  color: #81c784;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.strip-ctx-nav strong {
+  color: #ffe082;
+  font-size: 0.82rem;
+}
+
+.strip-ctx-type {
+  display: block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.strip-ctx-nav p {
+  margin: 0.2rem 0;
+  color: var(--text-muted);
+}
+
+.strip-ctx-captain {
+  display: block;
+  color: #ffcc80;
+  font-size: 0.72rem;
+}
+
+.strip-ctx-coords {
+  margin-top: 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.nav-marker .nav-dot {
+  width: 16px;
+  height: 16px;
+  background: #ffd54f;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(255, 213, 79, 0.7);
+  font-size: 8px;
+  line-height: 12px;
+  text-align: center;
+}
+
+.popup-captain {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.85em;
+  color: #ffe082;
+}
+
 .footer {
   padding: 0.85rem 1.5rem;
   border-top: 1px solid var(--border);
