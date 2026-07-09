@@ -26,7 +26,7 @@ npm run dev
 
 После публикации на GitHub Pages:
 
-**https://frankhorr.github.io/expedition-route-map/**
+**https://okb91.github.io/expedition-route-map/**
 
 ## Публикация на GitHub
 
@@ -35,7 +35,7 @@ npm run dev
 3. Выполните:
 
 ```bash
-git remote add origin https://github.com/frankhorr/expedition-route-map.git
+git remote add origin https://github.com/okb91/expedition-route-map.git
 git push -u origin main
 ```
 
