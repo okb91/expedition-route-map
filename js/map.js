@@ -44,15 +44,18 @@ const LayerControl = L.Control.extend({
   onAdd(map) {
     this._map = map;
     const container = L.DomUtil.create('div', 'leaflet-control custom-layer-control');
+    container.id = 'layer-control';
     L.DomEvent.disableClickPropagation(container);
 
-    const baseBlock = L.DomUtil.create('div', 'layer-block', container);
+    const panel = L.DomUtil.create('div', 'layer-panel', container);
+
+    const baseBlock = L.DomUtil.create('div', 'layer-block', panel);
     L.DomUtil.create('div', 'layer-block-title', baseBlock).textContent = 'Подложка';
     this._baseLayers.forEach(({ label, layer, color }) => {
       baseBlock.appendChild(this._makeRadio(label, layer, color));
     });
 
-    const overlayBlock = L.DomUtil.create('div', 'layer-block', container);
+    const overlayBlock = L.DomUtil.create('div', 'layer-block', panel);
     L.DomUtil.create('div', 'layer-block-title', overlayBlock).textContent = 'Слои';
     this._overlays.forEach(({ label, layer, color, dash }) => {
       overlayBlock.appendChild(this._makeCheckbox(label, layer, color, dash));
@@ -100,6 +103,82 @@ const LayerControl = L.Control.extend({
 
 function createLayerControl(map, baseLayers, overlays) {
   return new LayerControl(overlays, baseLayers).addTo(map);
+}
+
+function setupMobileMapControls(map, mapWrap) {
+  const layerCtrl = document.getElementById('layer-control');
+  const btnLayers = document.getElementById('btn-toggle-layers');
+  const btnFs = document.getElementById('btn-map-fullscreen');
+  const mobileMq = window.matchMedia('(max-width: 768px)');
+
+  function closeLayers() {
+    layerCtrl?.classList.remove('is-open');
+    btnLayers?.setAttribute('aria-expanded', 'false');
+  }
+
+  btnLayers?.addEventListener('click', (e) => {
+    L.DomEvent.stopPropagation(e);
+    if (!mobileMq.matches) return;
+    const open = layerCtrl?.classList.toggle('is-open');
+    btnLayers.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  map.on('click', closeLayers);
+
+  document.addEventListener('click', (e) => {
+    if (!mobileMq.matches || !layerCtrl?.classList.contains('is-open')) return;
+    if (layerCtrl.contains(e.target) || btnLayers?.contains(e.target)) return;
+    closeLayers();
+  });
+
+  function isFullscreen() {
+    return document.fullscreenElement === mapWrap
+      || document.webkitFullscreenElement === mapWrap
+      || mapWrap.classList.contains('is-pseudo-fullscreen');
+  }
+
+  function enterFullscreen() {
+    if (mapWrap.requestFullscreen) {
+      mapWrap.requestFullscreen().catch(() => mapWrap.classList.add('is-pseudo-fullscreen'));
+      return;
+    }
+    if (mapWrap.webkitRequestFullscreen) {
+      mapWrap.webkitRequestFullscreen();
+      return;
+    }
+    mapWrap.classList.add('is-pseudo-fullscreen');
+  }
+
+  function exitFullscreen() {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    }
+    mapWrap.classList.remove('is-pseudo-fullscreen');
+  }
+
+  btnFs?.addEventListener('click', () => {
+    if (isFullscreen()) exitFullscreen();
+    else enterFullscreen();
+  });
+
+  function onFullscreenChange() {
+    map.invalidateSize({ animate: false });
+    const fs = isFullscreen();
+    if (btnFs) {
+      btnFs.textContent = fs ? '✕' : '⛶';
+      btnFs.title = fs ? 'Выйти из полного экрана' : 'Полный экран';
+    }
+    mapWrap.classList.toggle('is-fullscreen', fs);
+    if (!fs) mapWrap.classList.remove('is-pseudo-fullscreen');
+  }
+
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
+  mobileMq.addEventListener('change', () => {
+    if (!mobileMq.matches) closeLayers();
+  });
 }
 
 export function createMap(containerId, routePoints, editorCallbacks) {
@@ -205,6 +284,8 @@ export function createMap(containerId, routePoints, editorCallbacks) {
       { label: 'Точки интереса (POI)', layer: poiLayer, color: '#ff4081' },
     ]
   );
+
+  setupMobileMapControls(map, document.getElementById('map-wrap'));
 
   let cursorMarker = null;
   let editMode = false;

@@ -36,7 +36,13 @@
         <h2>Географическая карта</h2>
         <span class="badge">GEBCO + Marine Regions</span>
       </div>
-      <div id="map" class="map"></div>
+      <div class="map-wrap" id="map-wrap">
+        <div class="map-mobile-bar">
+          <button type="button" id="btn-toggle-layers" class="map-float-btn" aria-expanded="false" aria-controls="layer-control">☰ Слои</button>
+          <button type="button" id="btn-map-fullscreen" class="map-float-btn" title="Полный экран">⛶</button>
+        </div>
+        <div id="map" class="map"></div>
+      </div>
       <div class="zone-legend" id="zone-legend"></div>
     </section>
 
