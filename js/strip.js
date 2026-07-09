@@ -1,5 +1,15 @@
+import { POIS } from './pois.js';
 import { ZONE_TYPES, queryGebcoDepth } from './zones.js';
-import { estimateDepth } from './route.js';
+import { estimateDepth, haversineKm } from './route.js';
+
+const COUNTRY_NAMES = {
+  MA: 'Марокко', CV: 'Кабо-Верде', GP: 'Гваделупа', PA: 'Панама', EC: 'Эcuador',
+  PF: 'Fr. Полинезия', FJ: 'Фиджи', AU: 'Австралия', TH: 'Таиланд', LK: 'Шри-Ланка',
+  OM: 'Оман', DJ: 'Джибути', EG: 'Египет', TR: 'Турция',
+};
+
+const DEPTH_MARKS = [1000, 2000, 3000, 4000, 5000, 6000];
+const MAX_DEPTH = 6000;
 
 export function createStripView(container, callbacks) {
   let routeData = null;
@@ -12,10 +22,13 @@ export function createStripView(container, callbacks) {
   let depths = [];
   let activeIndex = 0;
   let pxPerNm = 3;
-  const height = 280;
-  const profileHeight = 100;
-  const zoneBandHeight = 50;
-  const trackY = 40;
+
+  const height = 400;
+  const profileHeight = 110;
+  const zoneBandHeight = 44;
+  const poiRowY = 98;
+  const trackY = 72;
+  const labelRowY = 48;
 
   function ensureDom() {
     if (scrollWrap) return;
@@ -67,6 +80,25 @@ export function createStripView(container, callbacks) {
     return best;
   }
 
+  function nearestRouteDistanceNm(points, lat, lon) {
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      const d = haversineKm({ lat, lon }, { lat: p.lat, lon: p.lon });
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = i;
+      }
+    }
+    return points[bestIdx].distanceNm;
+  }
+
+  function depthToY(depth, profileTop) {
+    const d = Math.min(Math.abs(depth ?? 2000), MAX_DEPTH);
+    return profileTop + (d / MAX_DEPTH) * (profileHeight - 14);
+  }
+
   function getZoneAt(i) {
     const z = zoneResults?.[i];
     if (!z) return ZONE_TYPES.unknown;
@@ -92,6 +124,145 @@ export function createStripView(container, callbacks) {
     draw();
   }
 
+  function drawDistanceRuler(width, totalNm, y) {
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = '9px "JetBrains Mono", monospace';
+    const step = totalNm > 15000 ? 3000 : 2000;
+    for (let nm = 0; nm <= totalNm; nm += step) {
+      const x = nmToX(nm);
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+      ctx.fillText(`${Math.round(nm).toLocaleString('ru-RU')} ММ`, x + 3, y + 10);
+    }
+  }
+
+  function drawDepthGrid(profileTop, width) {
+    DEPTH_MARKS.forEach((m) => {
+      const y = depthToY(-m, profileTop);
+      ctx.strokeStyle = 'rgba(79, 195, 247, 0.2)';
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(79, 195, 247, 0.75)';
+      ctx.font = '9px "JetBrains Mono", monospace';
+      ctx.fillText(`${(m / 1000).toFixed(0)}k`, 4, y - 2);
+    });
+  }
+
+  function drawDepthSamples(points, profileTop) {
+    const stepNm = 800;
+    let lastNm = -stepNm;
+    ctx.font = '8px "JetBrains Mono", monospace';
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      if (p.distanceNm - lastNm < stepNm && i !== points.length - 1) continue;
+      lastNm = p.distanceNm;
+      const depth = depths[i];
+      if (depth == null) continue;
+      const x = nmToX(p.distanceNm);
+      const y = depthToY(depth, profileTop);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.beginPath();
+      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      const label = `${Math.round(Math.abs(depth))} м`;
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.save();
+      ctx.translate(x + 4, y - 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(label, 0, 0);
+      ctx.restore();
+    }
+  }
+
+  function drawWaypoints(points) {
+    waypoints.forEach((wp, idx) => {
+      const pt = points.find((p) => p.waypoint?.id === wp.id);
+      if (!pt) return;
+      const x = nmToX(pt.distanceNm);
+      const country = COUNTRY_NAMES[wp.country] || wp.country || '';
+
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, labelRowY);
+      ctx.lineTo(x, poiRowY + 14);
+      ctx.stroke();
+
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(x, trackY, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#00e5ff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#00e5ff';
+      ctx.font = 'bold 9px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(String(idx + 1), x, trackY + 3);
+      ctx.textAlign = 'left';
+
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.font = 'bold 10px "Manrope", sans-serif';
+      ctx.textAlign = 'center';
+      const name = wp.name.length > 22 ? `${wp.name.slice(0, 20)}…` : wp.name;
+      ctx.fillText(name, x, labelRowY - 14);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.font = '9px "Manrope", sans-serif';
+      const sub = [wp.place, country].filter(Boolean).join(' · ');
+      ctx.fillText(sub, x, labelRowY - 2);
+      ctx.textAlign = 'left';
+    });
+  }
+
+  function drawPois(points) {
+    const placed = POIS.map((poi) => ({
+      ...poi,
+      distanceNm: nearestRouteDistanceNm(points, poi.lat, poi.lon),
+    })).sort((a, b) => a.distanceNm - b.distanceNm);
+
+    let lastX = -999;
+    placed.forEach((poi, i) => {
+      const x = nmToX(poi.distanceNm);
+      if (x - lastX < 28 && i > 0) return;
+      lastX = x;
+
+      ctx.strokeStyle = 'rgba(255, 64, 129, 0.35)';
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x, poiRowY - 4);
+      ctx.lineTo(x, trackY + 10);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#ff4081';
+      ctx.beginPath();
+      ctx.moveTo(x, poiRowY);
+      ctx.lineTo(x - 4, poiRowY + 7);
+      ctx.lineTo(x + 4, poiRowY + 7);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.save();
+      ctx.translate(x, poiRowY + 10);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = 'rgba(255, 128, 171, 0.9)';
+      ctx.font = '8px "Manrope", sans-serif';
+      ctx.textAlign = 'left';
+      const short = poi.name.length > 20 ? `${poi.name.slice(0, 18)}…` : poi.name;
+      ctx.fillText(short, 0, 0);
+      ctx.restore();
+    });
+  }
+
   function draw() {
     if (!routeData || !ctx) return;
     const { points, totalNm } = routeData;
@@ -102,13 +273,19 @@ export function createStripView(container, callbacks) {
     ctx.fillStyle = '#0a1628';
     ctx.fillRect(0, 0, width, height);
 
-    const zoneTop = height - profileHeight - zoneBandHeight - 10;
+    drawDistanceRuler(width, totalNm, 18);
+
+    const zoneTop = height - profileHeight - zoneBandHeight - 8;
+
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = '10px "Manrope", sans-serif';
+    ctx.fillText('Локации / страны', 8, 32);
+    ctx.fillText('POI (научные станции)', 8, poiRowY - 6);
 
     for (let i = 1; i < points.length; i++) {
       const x0 = nmToX(points[i - 1].distanceNm);
       const x1 = nmToX(points[i].distanceNm);
-      const zone = getZoneAt(i);
-      ctx.fillStyle = zone.fill;
+      ctx.fillStyle = getZoneAt(i).fill;
       ctx.fillRect(x0, zoneTop, x1 - x0 + 1, zoneBandHeight);
     }
 
@@ -123,19 +300,18 @@ export function createStripView(container, callbacks) {
     ctx.setLineDash([]);
 
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.font = '11px "Segoe UI", sans-serif';
-    ctx.fillText('Морские зоны', 8, zoneTop - 6);
-    ctx.fillText('Батиметрия GEBCO (м)', 8, height - profileHeight - 2);
+    ctx.font='11px "Manrope", sans-serif';
+    ctx.fillText('Морские зоны', 8, zoneTop - 5);
+    ctx.fillText('Батиметрия GEBCO', 8, height - profileHeight - 4);
 
     const profileTop = height - profileHeight;
-    const maxDepth = 6000;
+    drawDepthGrid(profileTop, width);
 
     ctx.beginPath();
     let started = false;
     for (let i = 0; i < points.length; i++) {
       const x = nmToX(points[i].distanceNm);
-      const depth = depths[i] ?? -2000;
-      const y = profileTop + (Math.min(Math.abs(depth), maxDepth) / maxDepth) * (profileHeight - 10);
+      const y = depthToY(depths[i], profileTop);
       if (!started) { ctx.moveTo(x, y); started = true; }
       else ctx.lineTo(x, y);
     }
@@ -152,42 +328,23 @@ export function createStripView(container, callbacks) {
     ctx.fillStyle = grad;
     ctx.fill();
 
+    drawDepthSamples(points, profileTop);
+
     ctx.beginPath();
     for (let i = 0; i < points.length; i++) {
       const x = nmToX(points[i].distanceNm);
-      const y = trackY + Math.sin(i * 0.08) * 2;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+      if (i === 0) ctx.moveTo(x, trackY);
+      else ctx.lineTo(x, trackY);
     }
     ctx.strokeStyle = '#00e5ff';
     ctx.lineWidth = 3;
     ctx.shadowColor = '#00e5ff';
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = 6;
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    waypoints.forEach((wp) => {
-      const pt = points.find((p) => p.waypoint?.id === wp.id);
-      if (!pt) return;
-      const x = nmToX(pt.distanceNm);
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(x, trackY, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#00e5ff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.save();
-      ctx.translate(x, trackY - 14);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.font = '10px "Segoe UI", sans-serif';
-      ctx.textAlign = 'left';
-      const label = wp.name.length > 18 ? `${wp.name.slice(0, 16)}…` : wp.name;
-      ctx.fillText(label, 0, 0);
-      ctx.restore();
-    });
+    drawPois(points);
+    drawWaypoints(points);
 
     const ax = nmToX(points[activeIndex]?.distanceNm ?? 0);
     ctx.strokeStyle = '#ff4081';

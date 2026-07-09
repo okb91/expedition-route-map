@@ -495,7 +495,7 @@ progress {
   background: #0a1628;
   border: 1px solid var(--border);
   border-radius: 8px;
-  height: 300px;
+  height: 420px;
   cursor: crosshair;
   scrollbar-width: thin;
   scrollbar-color: var(--accent) var(--bg-elevated);
@@ -512,7 +512,7 @@ progress {
 
 .strip-canvas {
   display: block;
-  height: 280px;
+  height: 400px;
 }
 
 .strip-cursor {
