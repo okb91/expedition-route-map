@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="/expedition-route-map/assets/index-BtqRHeTS.js"></script>
-  <link rel="stylesheet" crossorigin href="/expedition-route-map/assets/index-D5FHYFwT.css">
+  <script type="module" crossorigin src="/expedition-route-map/assets/index-zGUp__Zx.js"></script>
+  <link rel="stylesheet" crossorigin href="/expedition-route-map/assets/index-Cily28iD.css">
 </head>
 <body>
   <header class="header">
@@ -37,7 +37,13 @@
         <h2>Географическая карта</h2>
         <span class="badge">GEBCO + Marine Regions</span>
       </div>
-      <div id="map" class="map"></div>
+      <div class="map-wrap" id="map-wrap">
+        <div class="map-mobile-bar">
+          <button type="button" id="btn-toggle-layers" class="map-float-btn" aria-expanded="false" aria-controls="layer-control">☰ Слои</button>
+          <button type="button" id="btn-map-fullscreen" class="map-float-btn" title="Полный экран">⛶</button>
+        </div>
+        <div id="map" class="map"></div>
+      </div>
       <div class="zone-legend" id="zone-legend"></div>
     </section>
 
