@@ -15,6 +15,18 @@ const WP_ICON = { port: '⚓', canal: '🔧', passage: '⛵', science: '🔬' };
 const DEPTH_MARKS = [1000, 2000, 3000, 4000, 5000, 6000];
 const MAX_DEPTH = 6000;
 const SAMPLE_EVERY_NM = 100;
+const CAPE_LABELS = [
+  { name: 'мыс Спартель', lat: 35.79, lon: -5.94 },
+  { name: 'мыс Верде', lat: 14.75, lon: -17.53 },
+  { name: 'мыс Punta Mala', lat: 7.47, lon: -79.99 },
+  { name: 'мыс Horn', lat: -0.6, lon: -91.6 },
+  { name: 'мыс Venus', lat: -17.49, lon: -149.48 },
+  { name: 'мыс York', lat: -10.68, lon: 142.53 },
+  { name: 'мыс Comorin', lat: 8.08, lon: 77.55 },
+  { name: 'мыс Ras al Hadd', lat: 22.53, lon: 59.79 },
+  { name: 'мыс Ras Muhammad', lat: 27.73, lon: 34.25 },
+  { name: 'мыс Anamur', lat: 36.08, lon: 32.84 },
+];
 
 export function createStripView(container, callbacks) {
   let routeData = null;
@@ -136,8 +148,7 @@ export function createStripView(container, callbacks) {
     });
     scrollWrap.addEventListener('mouseleave', () => {
       hoverIndex = null;
-      probeEl.hidden = true;
-      hideContext();
+      updateProbe(activeIndex);
     });
 
     scrollWrap.addEventListener('keydown', (e) => {
@@ -310,9 +321,9 @@ export function createStripView(container, callbacks) {
     if (topPts.length < 2) return;
 
     ctx.beginPath();
-    ctx.moveTo(0, 0);
+    ctx.moveTo(0, horizon);
     for (const [x, y] of topPts) ctx.lineTo(x, y);
-    ctx.lineTo(width, 0);
+    ctx.lineTo(width, horizon);
     ctx.closePath();
     const landGrad = ctx.createLinearGradient(0, 0, 0, horizon);
     landGrad.addColorStop(0, '#1a3d2a');
@@ -337,7 +348,43 @@ export function createStripView(container, callbacks) {
       if (x - lastLabelX < 90) continue;
       lastLabelX = x;
       ctx.fillStyle = 'rgba(220, 255, 200, 0.9)';
-      ctx.fillText(cp.coastName, x + 4, topPts.find((p) => p[0] >= x)?.[1] - 6 ?? 18);
+      ctx.fillText(cp.coastName, x + 4, topPts.find((p) => p[0] >= x)?.[1] - 6 ?? (horizon - 6));
+    }
+  }
+
+  function drawCapeLabels(points) {
+    const labels = CAPE_LABELS
+      .map((c) => ({ ...c, distanceNm: nearestRouteDistanceNm(points, c.lat, c.lon) }))
+      .sort((a, b) => a.distanceNm - b.distanceNm);
+
+    ctx.font = 'bold 10px "Manrope", sans-serif';
+    ctx.fillStyle = 'rgba(214, 255, 196, 0.92)';
+    let lastX = -200;
+    for (const l of labels) {
+      const x = nmToX(l.distanceNm);
+      if (x - lastX < 95) continue;
+      lastX = x;
+      ctx.fillText(`▲ ${l.name}`, x + 4, 26);
+    }
+  }
+
+  function drawJurisdictionTint(width) {
+    if (!zoneResults?.length || !routeData?.points?.length) return;
+    const top = 0;
+    const bottom = trackY + 24;
+
+    for (let i = 1; i < routeData.points.length; i++) {
+      const x0 = nmToX(routeData.points[i - 1].distanceNm);
+      const x1 = nmToX(routeData.points[i].distanceNm);
+      const z = zoneResults[i]?.zone;
+      if (z === 'territorial') {
+        ctx.fillStyle = 'rgba(255, 82, 82, 0.10)';
+      } else if (z === 'eez') {
+        ctx.fillStyle = 'rgba(255, 202, 40, 0.08)';
+      } else {
+        continue;
+      }
+      ctx.fillRect(x0, top, Math.max(1, x1 - x0), bottom - top);
     }
   }
 
@@ -600,6 +647,7 @@ export function createStripView(container, callbacks) {
     const ctxInfo = getContextForIndex(idx);
     probeEl.hidden = false;
     probeEl.style.left = `${nmToX(p.distanceNm)}px`;
+    probeEl.style.top = `${trackY - 56}px`;
     probeEl.innerHTML = `
       <strong>${Math.round(p.distanceNm).toLocaleString('ru-RU')} ММ</strong>
       <span>🌊 ${depth != null ? `${Math.round(Math.abs(depth))} м` : '…'}</span>
@@ -608,10 +656,11 @@ export function createStripView(container, callbacks) {
     `;
 
     if (contextEl && ctxInfo) {
-      const showDetail = pxPerNm >= 3.5;
+      const showDetail = true;
       contextEl.hidden = !showDetail;
       if (showDetail) {
         contextEl.style.left = `${nmToX(p.distanceNm)}px`;
+        contextEl.style.top = `${trackY + 28}px`;
         const navBlock = ctxInfo.nav
           ? `<div class="strip-ctx-nav"><strong>${NAV_ICONS[ctxInfo.nav.type]} ${ctxInfo.nav.name}</strong>
              <span class="strip-ctx-type">${NAV_TYPES[ctxInfo.nav.type]}</span>
@@ -733,7 +782,9 @@ export function createStripView(container, callbacks) {
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, width, trackY + 20);
 
+    drawJurisdictionTint(width);
     drawCoastSilhouette(points, width);
+    drawCapeLabels(points);
 
     ctx.fillStyle = '#071220';
     ctx.fillRect(0, trackY + 20, width, CANVAS_H - trackY - 20);
@@ -849,6 +900,7 @@ export function createStripView(container, callbacks) {
     drawCanvas();
     renderOverlay(routeData.points);
     updateHud();
+    updateProbe(activeIndex);
     root.querySelector('[data-zoom-label]').textContent = `${Math.round((pxPerNm / 5) * 100)}%`;
   }
 
@@ -879,6 +931,7 @@ export function createStripView(container, callbacks) {
       initDepthsFromEstimate();
       coastProfile = [];
       draw();
+      requestAnimationFrame(draw);
       loadDepths();
       rebuildCoastProfile();
     },

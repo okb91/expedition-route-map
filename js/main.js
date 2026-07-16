@@ -212,6 +212,7 @@ async function init() {
     onPositionChange(p, zone, routeData) {
       const data = editor.getRouteData();
       updateInfoPanel(p, zone, data);
+      mapApi.setZoneContext(zone);
       mapApi.setCursorPosition(p);
       mapApi.panTo(p.lat, p.lon);
     },

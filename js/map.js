@@ -3,7 +3,7 @@ import 'leaflet/dist/leaflet.css';
 import { POIS } from './route.js';
 import { POI_TYPES } from './pois.js';
 import { ZONE_TYPES } from './zones.js';
-import { routeToDisplayLatLngs, unwrapRouteLongitudes, shiftLonNearCenter } from './geo.js';
+import { unwrapRouteLongitudes, shiftLonNearCenter } from './geo.js';
 import { NAV_FEATURES, NAV_ICONS, NAV_TYPES } from './navFeatures.js';
 
 const GEBCO_WMS = 'https://wms.gebco.net/mapserv?';
@@ -261,6 +261,10 @@ export function createMap(containerId, routePoints, editorCallbacks) {
 
   const routeLayerGroup = L.layerGroup().addTo(map);
   const waypointLayer = L.layerGroup().addTo(map);
+  const mapWrap = document.getElementById('map-wrap');
+  const zoneOverlay = document.createElement('div');
+  zoneOverlay.className = 'map-jurisdiction-overlay';
+  mapWrap?.appendChild(zoneOverlay);
 
   const poiLayer = L.layerGroup();
   POIS.forEach((poi) => {
@@ -316,7 +320,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
     ]
   );
 
-  setupMobileMapControls(map, document.getElementById('map-wrap'));
+  setupMobileMapControls(map, mapWrap);
 
   let cursorMarker = null;
   let editMode = false;
@@ -325,19 +329,25 @@ export function createMap(containerId, routePoints, editorCallbacks) {
   let markerById = new Map();
   let currentRoutePoints = [];
   let unwrappedRoute = [];
+  let currentRouteShift = 0;
+
+  function computeRouteShift(centerLon) {
+    if (!unwrappedRoute.length) return 0;
+    const first = unwrappedRoute[0].displayLon;
+    let shift = 0;
+    while (first + shift - centerLon > 180) shift -= 360;
+    while (first + shift - centerLon < -180) shift += 360;
+    return shift;
+  }
 
   function redrawRouteForView() {
     routeLayerGroup.clearLayers();
     if (!currentRoutePoints.length) return;
     const centerLon = map.getCenter().lng;
-    const latlngs = routeToDisplayLatLngs(currentRoutePoints, centerLon);
-    const style = { ...ROUTE_STYLE, noWrap: false, smoothFactor: 1.2 };
-    for (const offset of [-360, 0, 360]) {
-      L.polyline(
-        latlngs.map(([lat, lon]) => [lat, lon + offset]),
-        style,
-      ).addTo(routeLayerGroup);
-    }
+    currentRouteShift = computeRouteShift(centerLon);
+    const style = { ...ROUTE_STYLE, noWrap: true, smoothFactor: 1.2 };
+    const latlngs = unwrappedRoute.map((p) => [p.lat, p.displayLon + currentRouteShift]);
+    L.polyline(latlngs, style).addTo(routeLayerGroup);
   }
 
   function drawRoute(points) {
@@ -357,12 +367,11 @@ export function createMap(containerId, routePoints, editorCallbacks) {
 
   function placeCursor(p) {
     if (!p) return;
-    const centerLon = map.getCenter().lng;
     const idx = currentRoutePoints.indexOf(p);
     const displayLon =
       idx >= 0 && unwrappedRoute[idx]
-        ? shiftLonNearCenter(unwrappedRoute[idx].displayLon, centerLon)
-        : shiftLonNearCenter(p.lon, centerLon);
+        ? unwrappedRoute[idx].displayLon + currentRouteShift
+        : shiftLonNearCenter(p.lon, map.getCenter().lng);
     const latlng = [p.lat, displayLon];
     if (!cursorMarker) {
       cursorMarker = L.circleMarker(latlng, {
@@ -473,15 +482,22 @@ export function createMap(containerId, routePoints, editorCallbacks) {
     },
 
     panTo(lat, lon, zoom) {
-      const centerLon = map.getCenter().lng;
       const idx = currentRoutePoints.findIndex(
         (pt) => Math.abs(pt.lat - lat) < 0.0001 && Math.abs(pt.lon - lon) < 0.0001,
       );
       const displayLon =
         idx >= 0 && unwrappedRoute[idx]
-          ? shiftLonNearCenter(unwrappedRoute[idx].displayLon, centerLon)
-          : shiftLonNearCenter(lon, centerLon);
+          ? unwrappedRoute[idx].displayLon + currentRouteShift
+          : shiftLonNearCenter(lon, map.getCenter().lng);
       map.setView([lat, displayLon], zoom ?? map.getZoom(), { animate: true });
+    },
+
+    setZoneContext(zone) {
+      const z = zone?.zone;
+      zoneOverlay.classList.remove('territorial', 'eez', 'high-seas');
+      if (z === 'territorial') zoneOverlay.classList.add('territorial');
+      else if (z === 'eez') zoneOverlay.classList.add('eez');
+      else if (z === 'highSeas') zoneOverlay.classList.add('high-seas');
     },
 
     togglePois(visible) {
