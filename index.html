@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="/expedition-route-map/assets/index-BY4Jy6v3.js"></script>
-  <link rel="stylesheet" crossorigin href="/expedition-route-map/assets/index-U-BORFJg.css">
+  <script type="module" crossorigin src="/expedition-route-map/assets/index-BWmZLJdP.js"></script>
+  <link rel="stylesheet" crossorigin href="/expedition-route-map/assets/index-CoCcqvyi.css">
 </head>
 <body>
   <header class="header">
@@ -48,6 +48,19 @@
     </section>
 
     <aside class="sidebar">
+      <section class="panel tracker-panel">
+        <h2>Живая яхта (MarineTraffic)</h2>
+        <div class="tracker-controls">
+          <input id="mt-shipid" class="tracker-input" value="10690862" title="MarineTraffic shipid" />
+          <input id="mt-apikey" class="tracker-input" type="password" placeholder="API key (необязательно)" title="MarineTraffic API key" />
+        </div>
+        <div class="tracker-actions">
+          <button class="btn-sm" id="btn-mt-refresh">Обновить</button>
+          <button class="btn-sm" id="btn-mt-auto">Авто: вкл</button>
+        </div>
+        <p id="mt-status" class="progress-text">Ожидание данных…</p>
+      </section>
+
       <section class="panel info-panel-wrap">
         <h2>Текущая позиция</h2>
         <div id="info-panel" class="info-panel">Выберите точку на развёртке</div>
