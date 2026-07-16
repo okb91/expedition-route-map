@@ -326,6 +326,29 @@ a {
   color: var(--text-muted);
 }
 
+.tracker-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tracker-controls,
+.tracker-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.tracker-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.35rem 0.45rem;
+  font-size: 0.75rem;
+}
+
 .info-panel {
   background: var(--bg-elevated);
   border-radius: 8px;
@@ -961,6 +984,17 @@ progress {
   font-size: 8px;
   line-height: 12px;
   text-align: center;
+}
+
+.live-vessel-marker .live-vessel-icon {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  filter: drop-shadow(0 0 8px rgba(255, 213, 79, 0.8));
+  transition: transform 0.2s ease;
+  transform-origin: 50% 50%;
 }
 
 .popup-captain {

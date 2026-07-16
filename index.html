@@ -47,6 +47,19 @@
     </section>
 
     <aside class="sidebar">
+      <section class="panel tracker-panel">
+        <h2>Живая яхта (MarineTraffic)</h2>
+        <div class="tracker-controls">
+          <input id="mt-shipid" class="tracker-input" value="10690862" title="MarineTraffic shipid" />
+          <input id="mt-apikey" class="tracker-input" type="password" placeholder="API key (необязательно)" title="MarineTraffic API key" />
+        </div>
+        <div class="tracker-actions">
+          <button class="btn-sm" id="btn-mt-refresh">Обновить</button>
+          <button class="btn-sm" id="btn-mt-auto">Авто: вкл</button>
+        </div>
+        <p id="mt-status" class="progress-text">Ожидание данных…</p>
+      </section>
+
       <section class="panel info-panel-wrap">
         <h2>Текущая позиция</h2>
         <div id="info-panel" class="info-panel">Выберите точку на развёртке</div>

@@ -261,6 +261,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
 
   const routeLayerGroup = L.layerGroup().addTo(map);
   const waypointLayer = L.layerGroup().addTo(map);
+  const liveLayer = L.layerGroup().addTo(map);
   const mapWrap = document.getElementById('map-wrap');
   const zoneOverlay = document.createElement('div');
   zoneOverlay.className = 'map-jurisdiction-overlay';
@@ -330,6 +331,9 @@ export function createMap(containerId, routePoints, editorCallbacks) {
   let currentRoutePoints = [];
   let unwrappedRoute = [];
   let currentRouteShift = 0;
+  let liveMarker = null;
+  let liveTrail = null;
+  let liveTrack = [];
 
   function computeRouteShift(centerLon) {
     if (!unwrappedRoute.length) return 0;
@@ -384,6 +388,44 @@ export function createMap(containerId, routePoints, editorCallbacks) {
     } else {
       cursorMarker.setLatLng(latlng);
     }
+  }
+
+  function setLiveVesselPosition(pos) {
+    const { lat, lon, heading = 0 } = pos;
+    const displayLon = shiftLonNearCenter(lon, map.getCenter().lng);
+    const latlng = [lat, displayLon];
+
+    if (!liveMarker) {
+      const icon = L.divIcon({
+        className: 'live-vessel-marker',
+        html: '<div class="live-vessel-icon">⛵</div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      });
+      liveMarker = L.marker(latlng, { icon }).addTo(liveLayer);
+      liveTrail = L.polyline([], {
+        color: '#ffd54f',
+        weight: 2,
+        opacity: 0.85,
+        dashArray: '5 4',
+      }).addTo(liveLayer);
+    } else {
+      liveMarker.setLatLng(latlng);
+    }
+
+    const iconEl = liveMarker.getElement()?.querySelector('.live-vessel-icon');
+    if (iconEl) iconEl.style.transform = `rotate(${heading}deg)`;
+
+    liveTrack.push(latlng);
+    if (liveTrack.length > 40) liveTrack.shift();
+    liveTrail?.setLatLngs(liveTrack);
+
+    const popup = `
+      <strong>⛵ Реальная позиция</strong><br/>
+      <span class="popup-coords">${lat.toFixed(4)}°, ${lon.toFixed(4)}°</span><br/>
+      <span class="popup-poi-type">SOG ${Number(pos.speed || 0).toFixed(1)} kn · COG ${Number(pos.course || 0).toFixed(0)}°</span>
+    `;
+    liveMarker.bindPopup(popup);
   }
 
   function bindWaypointMarker(marker, wp, index) {
@@ -498,6 +540,10 @@ export function createMap(containerId, routePoints, editorCallbacks) {
       if (z === 'territorial') zoneOverlay.classList.add('territorial');
       else if (z === 'eez') zoneOverlay.classList.add('eez');
       else if (z === 'highSeas') zoneOverlay.classList.add('high-seas');
+    },
+
+    setLiveVesselPosition(pos) {
+      setLiveVesselPosition(pos);
     },
 
     togglePois(visible) {

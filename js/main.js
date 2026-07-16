@@ -4,6 +4,12 @@ import { classifyRoute, ZONE_TYPES } from './zones.js';
 import { createMap } from './map.js';
 import { createStripView } from './strip.js';
 import { createRouteEditor } from './routeEditor.js';
+import {
+  fetchMarineTrafficPosition,
+  formatLiveStatus,
+  loadTrackerState,
+  trackerStateFromInputs,
+} from './marineTraffic.js';
 import L from 'leaflet';
 
 function formatNm(nm) {
@@ -147,6 +153,58 @@ let mapApi = null;
 let stripApi = null;
 let zoneToken = 0;
 let firstRouteLoad = true;
+let mtTimer = null;
+
+function initLiveTracker() {
+  const shipIdInput = document.getElementById('mt-shipid');
+  const apiKeyInput = document.getElementById('mt-apikey');
+  const btnRefresh = document.getElementById('btn-mt-refresh');
+  const btnAuto = document.getElementById('btn-mt-auto');
+  const statusEl = document.getElementById('mt-status');
+  if (!shipIdInput || !apiKeyInput || !btnRefresh || !btnAuto || !statusEl) return;
+
+  const saved = loadTrackerState();
+  shipIdInput.value = saved.shipId || shipIdInput.value || '10690862';
+  apiKeyInput.value = saved.apiKey || '';
+  let autoOn = saved.autoOn ?? true;
+
+  const save = () => trackerStateFromInputs(shipIdInput.value.trim(), apiKeyInput.value.trim(), autoOn);
+
+  async function updateLivePosition() {
+    const shipId = shipIdInput.value.trim();
+    const apiKey = apiKeyInput.value.trim();
+    if (!shipId) return;
+    statusEl.textContent = 'Запрос позиции MarineTraffic...';
+    save();
+    try {
+      const pos = await fetchMarineTrafficPosition(shipId, apiKey);
+      mapApi.setLiveVesselPosition(pos);
+      statusEl.textContent = formatLiveStatus(pos);
+    } catch (err) {
+      statusEl.textContent = apiKey
+        ? 'Не удалось получить MarineTraffic (проверьте API key/лимиты)'
+        : 'Публичный endpoint MarineTraffic блокируется (Cloudflare). Добавьте API key.';
+    }
+  }
+
+  function restartAuto() {
+    if (mtTimer) clearInterval(mtTimer);
+    if (autoOn) mtTimer = setInterval(updateLivePosition, 60000);
+    btnAuto.textContent = `Авто: ${autoOn ? 'вкл' : 'выкл'}`;
+    save();
+  }
+
+  btnRefresh.addEventListener('click', updateLivePosition);
+  btnAuto.addEventListener('click', () => {
+    autoOn = !autoOn;
+    restartAuto();
+  });
+  shipIdInput.addEventListener('change', updateLivePosition);
+  apiKeyInput.addEventListener('change', updateLivePosition);
+
+  restartAuto();
+  updateLivePosition();
+}
 
 async function reclassifyZones(routeData) {
   const token = ++zoneToken;
@@ -225,6 +283,7 @@ async function init() {
   });
   mapApi.togglePois(document.getElementById('toggle-pois')?.checked ?? true);
   mapApi.toggleNav(true);
+  initLiveTracker();
 
   document.getElementById('btn-start')?.addEventListener('click', () => {
     stripApi.scrollToIndex(0);
