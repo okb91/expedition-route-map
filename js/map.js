@@ -3,7 +3,7 @@ import 'leaflet/dist/leaflet.css';
 import { POIS } from './route.js';
 import { POI_TYPES } from './pois.js';
 import { ZONE_TYPES } from './zones.js';
-import { unwrapRouteLongitudes, shiftLonNearCenter } from './geo.js';
+import { splitRouteForMap, unwrapRouteLongitudes, shiftLonNearCenter } from './geo.js';
 import { NAV_FEATURES, NAV_ICONS, NAV_TYPES } from './navFeatures.js';
 
 const GEBCO_WMS = 'https://wms.gebco.net/mapserv?';
@@ -189,11 +189,12 @@ export function createMap(containerId, routePoints, editorCallbacks) {
     zoom: 3,
     minZoom: 2,
     maxZoom: 12,
-    worldCopyJump: false,
+    worldCopyJump: true,
+    attributionControl: false,
   });
 
   const osmFallback = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap',
+    attribution: '',
     maxZoom: 19,
     opacity: 0.15,
   });
@@ -204,7 +205,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
     transparent: false,
     version: '1.3.0',
     crs: L.CRS.EPSG4326,
-    attribution: 'GEBCO Compilation Group (2024) GEBCO 2024 Grid',
+    attribution: '',
   });
 
   const gebcoColor = L.tileLayer.wms(GEBCO_WMS, {
@@ -214,7 +215,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
     version: '1.3.0',
     crs: L.CRS.EPSG4326,
     opacity: 0.6,
-    attribution: 'GEBCO',
+    attribution: '',
   });
 
   const highSeas = L.tileLayer.wms(VLIZ_WMS, {
@@ -223,7 +224,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
     transparent: true,
     version: '1.3.0',
     opacity: 0.35,
-    attribution: 'Marine Regions / VLIZ',
+    attribution: '',
   });
 
   const eez = L.tileLayer.wms(VLIZ_WMS, {
@@ -232,7 +233,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
     transparent: true,
     version: '1.3.0',
     opacity: 0.4,
-    attribution: 'Marine Regions / VLIZ',
+    attribution: '',
   });
 
   const territorial = L.tileLayer.wms(VLIZ_WMS, {
@@ -241,7 +242,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
     transparent: true,
     version: '1.3.0',
     opacity: 0.45,
-    attribution: 'Marine Regions / VLIZ',
+    attribution: '',
   });
 
   const eezBoundaries = L.tileLayer.wms(VLIZ_WMS, {
@@ -250,7 +251,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
     transparent: true,
     version: '1.3.0',
     opacity: 0.7,
-    attribution: 'Marine Regions / VLIZ',
+    attribution: '',
   });
 
   gebco.addTo(map);
@@ -280,6 +281,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
       <span class="popup-poi-type">${typeLabel}</span><br/>
       <em>${poi.note}</em>${refLine}${doiLine}
     `);
+    marker.bindTooltip(`🔬 ${poi.name} · ${typeLabel}`, { direction: 'top', offset: [0, -8] });
     poiLayer.addLayer(marker);
   });
 
@@ -299,6 +301,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
       <em>${f.note}</em><br/>
       <span class="popup-captain"><b>Капитану:</b> ${f.captain}</span>
     `);
+    marker.bindTooltip(`${NAV_ICONS[f.type] || '⚓'} ${f.name}`, { direction: 'top', offset: [0, -8] });
     navLayer.addLayer(marker);
   });
 
@@ -348,11 +351,16 @@ export function createMap(containerId, routePoints, editorCallbacks) {
   function redrawRouteForView() {
     routeLayerGroup.clearLayers();
     if (!currentRoutePoints.length) return;
-    const centerLon = map.getCenter().lng;
-    currentRouteShift = computeRouteShift(centerLon);
     const style = { ...ROUTE_STYLE, noWrap: true, smoothFactor: 1.2 };
-    const latlngs = unwrappedRoute.map((p) => [p.lat, p.displayLon + currentRouteShift]);
-    L.polyline(latlngs, style).addTo(routeLayerGroup);
+    const segments = splitRouteForMap(currentRoutePoints);
+    for (const offset of [-360, 0, 360]) {
+      segments.forEach((seg) => {
+        L.polyline(
+          seg.map(([lat, lon]) => [lat, lon + offset]),
+          style,
+        ).addTo(routeLayerGroup);
+      });
+    }
   }
 
   function drawRoute(points) {
@@ -434,6 +442,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
 
   function bindWaypointMarker(marker, wp, index) {
     marker.waypointId = wp.id;
+    marker.bindTooltip(`📍 ${index + 1}. ${wp.name}`, { direction: 'top', offset: [0, -8] });
 
     marker.bindPopup(() => {
       const coords = `${marker.getLatLng().lat.toFixed(4)}°, ${marker.getLatLng().lng.toFixed(4)}°`;
@@ -475,11 +484,10 @@ export function createMap(containerId, routePoints, editorCallbacks) {
   }
 
   function renderWaypoints(wps, editable) {
-    const centerLon = map.getCenter().lng;
     waypointLayer.clearLayers();
     markerById.clear();
     wps.forEach((wp, i) => {
-      const marker = L.marker([wp.lat, shiftLonNearCenter(wp.lon, centerLon)], {
+      const marker = L.marker([wp.lat, wp.lon], {
         icon: makeWaypointIcon(editable, i),
         draggable: editable,
         autoPan: true,
