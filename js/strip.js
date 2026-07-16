@@ -932,6 +932,7 @@ export function createStripView(container, callbacks) {
       coastProfile = [];
       draw();
       requestAnimationFrame(draw);
+      setTimeout(draw, 60);
       loadDepths();
       rebuildCoastProfile();
     },

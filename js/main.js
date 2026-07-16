@@ -10,7 +10,6 @@ import {
   loadTrackerState,
   trackerStateFromInputs,
 } from './marineTraffic.js';
-import L from 'leaflet';
 
 function formatNm(nm) {
   return `${nm.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ММ`;
@@ -155,7 +154,7 @@ let zoneToken = 0;
 let firstRouteLoad = true;
 let mtTimer = null;
 
-function initLiveTracker() {
+function initLiveTracker(getRouteData) {
   const shipIdInput = document.getElementById('mt-shipid');
   const apiKeyInput = document.getElementById('mt-apikey');
   const btnRefresh = document.getElementById('btn-mt-refresh');
@@ -181,6 +180,19 @@ function initLiveTracker() {
       mapApi.setLiveVesselPosition(pos);
       statusEl.textContent = formatLiveStatus(pos);
     } catch (err) {
+      const data = getRouteData?.();
+      const p = data?.points?.[0];
+      if (p) {
+        mapApi.setLiveVesselPosition({
+          lat: p.lat,
+          lon: p.lon,
+          speed: 0,
+          course: 0,
+          heading: 0,
+          shipName: 'Экспедиционная яхта',
+          ts: Date.now(),
+        });
+      }
       statusEl.textContent = apiKey
         ? 'Не удалось получить MarineTraffic (проверьте API key/лимиты)'
         : 'Публичный endpoint MarineTraffic блокируется (Cloudflare). Добавьте API key.';
@@ -252,8 +264,7 @@ async function init() {
       if (firstRouteLoad && routeData.points.length > 1) {
         firstRouteLoad = false;
         try {
-          const bounds = L.latLngBounds(routeData.points.map((p) => [p.lat, p.lon]));
-          if (bounds.isValid()) mapApi.map.fitBounds(bounds, { padding: [40, 40] });
+          mapApi.fitRouteBounds();
         } catch { /* ignore */ }
       }
     },
@@ -283,7 +294,7 @@ async function init() {
   });
   mapApi.togglePois(document.getElementById('toggle-pois')?.checked ?? true);
   mapApi.toggleNav(true);
-  initLiveTracker();
+  initLiveTracker(() => editor.getRouteData());
 
   document.getElementById('btn-start')?.addEventListener('click', () => {
     stripApi.scrollToIndex(0);
@@ -297,6 +308,14 @@ async function init() {
   document.getElementById('btn-add-waypoint')?.addEventListener('click', () => editor.toggleAddMode());
   document.getElementById('btn-reset-route')?.addEventListener('click', () => {
     if (confirm('Сбросить маршрут к исходным 16 точкам?')) editor.resetToDefault();
+  });
+
+  const legend = document.getElementById('zone-legend');
+  const legendBtn = document.getElementById('btn-toggle-legend');
+  legendBtn?.addEventListener('click', () => {
+    const collapsed = legend?.classList.toggle('is-collapsed');
+    legendBtn.textContent = collapsed ? 'Показать легенду' : 'Скрыть легенду';
+    legendBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
   });
 
   editor.init();

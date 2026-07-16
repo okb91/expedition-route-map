@@ -331,6 +331,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
   let currentRoutePoints = [];
   let unwrappedRoute = [];
   let currentRouteShift = 0;
+  let liveLastPos = null;
   let liveMarker = null;
   let liveTrail = null;
   let liveTrack = [];
@@ -362,9 +363,11 @@ export function createMap(containerId, routePoints, editorCallbacks) {
 
   map.on('moveend zoomend', () => {
     redrawRouteForView();
+    renderWaypoints(waypoints, editMode);
     if (cursorMarker && lastCursorPoint) {
       placeCursor(lastCursorPoint);
     }
+    if (liveLastPos) setLiveVesselPosition(liveLastPos);
   });
 
   let lastCursorPoint = null;
@@ -391,6 +394,7 @@ export function createMap(containerId, routePoints, editorCallbacks) {
   }
 
   function setLiveVesselPosition(pos) {
+    liveLastPos = pos;
     const { lat, lon, heading = 0 } = pos;
     const displayLon = shiftLonNearCenter(lon, map.getCenter().lng);
     const latlng = [lat, displayLon];
@@ -471,10 +475,11 @@ export function createMap(containerId, routePoints, editorCallbacks) {
   }
 
   function renderWaypoints(wps, editable) {
+    const centerLon = map.getCenter().lng;
     waypointLayer.clearLayers();
     markerById.clear();
     wps.forEach((wp, i) => {
-      const marker = L.marker([wp.lat, wp.lon], {
+      const marker = L.marker([wp.lat, shiftLonNearCenter(wp.lon, centerLon)], {
         icon: makeWaypointIcon(editable, i),
         draggable: editable,
         autoPan: true,
@@ -491,6 +496,14 @@ export function createMap(containerId, routePoints, editorCallbacks) {
     renderWaypoints(wps, editMode);
   }
 
+  function fitRouteBounds() {
+    if (!unwrappedRoute.length) return;
+    const centerLon = map.getCenter().lng;
+    const shift = computeRouteShift(centerLon);
+    const bounds = L.latLngBounds(unwrappedRoute.map((p) => [p.lat, p.displayLon + shift]));
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40] });
+  }
+
   map.on('click', (e) => {
     if (!editMode || !addMode) return;
     editorCallbacks?.onAddWaypoint?.(e.latlng.lat, e.latlng.lng);
@@ -503,6 +516,10 @@ export function createMap(containerId, routePoints, editorCallbacks) {
 
     setRoute(points, wps) {
       updateRoute(points, wps);
+    },
+
+    fitRouteBounds() {
+      fitRouteBounds();
     },
 
     setEditMode(enabled) {
